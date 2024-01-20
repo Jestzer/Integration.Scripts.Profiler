@@ -1,6 +1,6 @@
 module github.com/Jestzer/integration-scripts-profiler
 
-go 1.21.1
+go 1.21.6
 
 //go 1.23
 

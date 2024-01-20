@@ -26,11 +26,13 @@ func main() {
 
 	// Goodies.
 	var defaultTMP string
-	var inputHasBeenAccepted bool
 	var schedulerSelected string
+	var organizationSelected string
+	var clusterCount int
+	var clusterName string
 
+	// # Add some code that'll load any preferences for the program.
 	// # Add some code that'll allow arrow keys to be used when prompted for user input.
-	// # Add
 	// Setup for better Ctrl+C messaging. This is a channel to receive OS signals.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
@@ -60,12 +62,47 @@ func main() {
 		os.Exit(0)
 	}
 
+	for {
+		fmt.Print("Enter the organization's name.\n")
+		organizationSelected, _ = reader.ReadString('\n')
+		organizationSelected = strings.TrimSpace(organizationSelected)
+
+		if organizationSelected == "" {
+			fmt.Print("Invalid entry. ")
+			continue
+		} else {
+			break
+		}
+	}
+
+	for {
+		fmt.Print("Enter the number of clusters you'd like to make scripts for. 1-6 are accepted. Entering nothing will select 1.\n")
+		fmt.Scan(&clusterCount)
+		break
+	}
+
+	for {
+		fmt.Print("Enter the cluster's name.\n")
+		clusterName, _ = reader.ReadString('\n')
+		clusterName = strings.TrimSpace(clusterName)
+
+		if clusterName == "" {
+			fmt.Print("Invalid entry. ")
+			continue
+		} else {
+			break
+		}
+	}
+
 	// waaaahhhh it's too difficult to just say "while".
-	for inputHasBeenAccepted == false {
-		fmt.Print("Select the scheduler you'd like to use by entering its corresponding number.")
+	for {
+		fmt.Print("Select the scheduler you'd like to use by entering its corresponding number. Entering nothing will select Slurm.\n")
+		fmt.Print("[1 Slurm] [2 PBS] [3 LSF] [4 Grid Engine] [5 HTCondor] [6 AWS] [7 Kubernetes]\n")
 		schedulerSelected, _ = reader.ReadString('\n')
 		schedulerSelected = strings.TrimSpace(schedulerSelected)
-		fmt.Print(defaultTMP) // Putting this here for now so Go will shut the hell up.
+		break
+		// Shut the hell up Go.
+		fmt.Print(defaultTMP)
 	}
 
 }
@@ -92,7 +129,7 @@ func downloadFile(url string, filePath string) error {
 	return nil
 }
 
-// Function to unzip MPM, since we have to on Windows and macOS.
+// Function to unzip integration scripts.
 func unzipFile(src, dest string) error {
 	reader, err := zip.OpenReader(src)
 	if err != nil {
