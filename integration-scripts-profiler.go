@@ -118,8 +118,13 @@ func main() {
 		fmt.Println("Beginning download of integration scripts. Please wait.")
 
 		var integrationScriptsURLs = map[string]string{
-			"https://codeload.github.com/mathworks/matlab-parallel-slurm-plugin/zip/refs/heads/main": "slurm.zip",
-			"https://codeload.github.com/mathworks/matlab-parallel-pbs-plugin/zip/refs/heads/main":   "pbs.zip",
+			"https://codeload.github.com/mathworks/matlab-parallel-slurm-plugin/zip/refs/heads/main":      "slurm.zip",
+			"https://codeload.github.com/mathworks/matlab-parallel-pbs-plugin/zip/refs/heads/main":        "pbs.zip",
+			"https://codeload.github.com/mathworks/matlab-parallel-lsf-plugin/zip/refs/heads/main":        "lsf.zip",
+			"https://codeload.github.com/mathworks/matlab-parallel-htcondor-plugin/zip/refs/heads/main":   "htcondor.zip",
+			"https://codeload.github.com/mathworks/matlab-parallel-gridengine-plugin/zip/refs/heads/main": "gridengine.zip",
+			"https://codeload.github.com/mathworks/matlab-parallel-awsbatch-plugin/zip/refs/heads/main":   "awsbatch.zip",
+			"https://codeload.github.com/mathworks/matlab-parallel-kubernetes-plugin/zip/refs/heads/main": "kubernetes.zip",
 		}
 
 		for url, fileName := range integrationScriptsURLs {
