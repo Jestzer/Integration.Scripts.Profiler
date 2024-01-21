@@ -134,7 +134,9 @@ func main() {
 				fmt.Println("Failed to download integration scripts: ", err)
 				continue
 			}
-			fmt.Println("Integration scripts downloaded successfully!")
+			if strings.Contains(fileName, "kubernetes.zip") {
+				fmt.Println("Integration scripts downloaded successfully!")
+			}
 		}
 	}
 
