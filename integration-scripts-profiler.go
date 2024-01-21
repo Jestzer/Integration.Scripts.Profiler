@@ -14,17 +14,17 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/eiannone/keyboard"
+	"github.com/chzyer/readline"
 	"github.com/fatih/color"
 )
 
 func main() {
 	// To handle keyboard input better.
-	err := keyboard.Open()
+	rl, err := readline.New("> ")
 	if err != nil {
 		panic(err)
 	}
-	defer keyboard.Close()
+	defer rl.Close()
 
 	// Colors used across the program.
 	redBackground := color.New(color.BgRed).SprintFunc()
@@ -153,34 +153,15 @@ func main() {
 
 	for {
 		fmt.Print("Enter the organization's name.\n")
-		organizationSelected, _ = reader.ReadString('\n')
+		organizationSelected, err = rl.Readline()
+		if err != nil { // Handle error. For example, if user enters Ctrl+C.
+			fmt.Println("Error reading line:", err)
+			return
+		}
 		organizationSelected = strings.TrimSpace(organizationSelected)
 
-		for {
-			char, key, err := keyboard.GetKey()
-			if err != nil {
-				panic(err)
-			}
-
-			if key == keyboard.KeyEnter {
-				break
-			}
-
-			if key == keyboard.KeySpace {
-				fmt.Print(" ")
-			} else if key == keyboard.KeyBackspace {
-				fmt.Print("\b \b") // Move cursor back and overwrite with space
-			} else if key == keyboard.KeyArrowLeft {
-				fmt.Print("\033[D") // Move cursor left
-			} else if key == keyboard.KeyArrowRight {
-				fmt.Print("\033[C") // Move cursor right
-			} else {
-				fmt.Print(string(char))
-			}
-		}
-
 		if organizationSelected == "" {
-			fmt.Print(redText("Invalid entry. "))
+			fmt.Print("Invalid entry. ")
 			continue
 		} else {
 			break
