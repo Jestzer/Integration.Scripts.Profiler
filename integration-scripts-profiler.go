@@ -30,11 +30,8 @@ func main() {
 	redBackground := color.New(color.BgRed).SprintFunc()
 	redText := color.New(color.FgRed).SprintFunc()
 
-	// For reading user input.
-	reader := bufio.NewReader(os.Stdin)
-	var input string
-
 	// Goodies.
+	var input string
 	var scriptsDownloadPath string
 	var schedulerSelected string
 	var organizationSelected string
@@ -50,7 +47,6 @@ func main() {
 	var caseNumber int
 
 	// # Add some code that'll load any preferences for the program.
-	// # Add some code that'll allow arrow keys to be used when prompted for user input.
 	// Setup for better Ctrl+C messaging. This is a channel to receive OS signals.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
@@ -85,41 +81,41 @@ func main() {
 	if err != nil {
 		fmt.Print(redText("\nError getting current working directory while looking for user settings : ", err, " Default settings will be used instead."))
 		return
-	}
-
-	settingsPath := filepath.Join(currentDir, "settings.txt")
-
-	// Check if the settings file exists.
-	if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
-		// No settings found.
-		return
-	} else if err != nil {
-		fmt.Print("\nError checking for user settings: ", err, " Default settings will be used instead.")
 	} else {
-		fmt.Print("\nCustom settings found!")
-		file, err := os.Open(settingsPath)
-		if err != nil {
-			fmt.Println("\nError opening settings file: ", err, " Default settings will be used instead.")
+		settingsPath := filepath.Join(currentDir, "settings.txt")
+
+		// Check if the settings file exists.
+		if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+			// No settings found.
 			return
-		}
-		defer file.Close()
+		} else if err != nil {
+			fmt.Print("\nError checking for user settings: ", err, " Default settings will be used instead.")
+		} else {
+			fmt.Print("\nCustom settings found!")
+			file, err := os.Open(settingsPath)
+			if err != nil {
+				fmt.Println("\nError opening settings file: ", err, " Default settings will be used instead.")
+				return
+			}
+			defer file.Close()
 
-		scanner := bufio.NewScanner(file)
+			scanner := bufio.NewScanner(file)
 
-		for scanner.Scan() {
-			line := scanner.Text()
+			for scanner.Scan() {
+				line := scanner.Text()
 
-			if !strings.HasPrefix(line, "#") {
-				// Process uncommented line.
-				fmt.Println("\nProcessing line:", line)
-				if strings.HasPrefix(line, "downloadScriptsOnLaunch") {
-					fmt.Println("\nHey there!")
+				if !strings.HasPrefix(line, "#") {
+					// Process uncommented line.
+					fmt.Println("\nProcessing line:", line)
+					if strings.HasPrefix(line, "downloadScriptsOnLaunch") {
+						fmt.Println("\nHey there!")
+					}
 				}
 			}
-		}
 
-		if err := scanner.Err(); err != nil {
-			fmt.Println("Error reading settings file:", err)
+			if err := scanner.Err(); err != nil {
+				fmt.Println("Error reading settings file:", err)
+			}
 		}
 	}
 
@@ -170,7 +166,11 @@ func main() {
 
 	for {
 		fmt.Print("Enter the Salesforce Case Number associated with these scripts.\n")
-		input, _ = reader.ReadString('\n')
+		input, err = rl.Readline()
+		if err != nil {
+			fmt.Println("Error reading line:", err)
+			return
+		}
 		input = strings.TrimSpace(input)
 
 		// Don't accept anything other than numbers.
@@ -186,7 +186,11 @@ func main() {
 
 	for {
 		fmt.Print("Enter the number of clusters you'd like to make scripts for. Entering nothing will select 1.\n")
-		input, _ = reader.ReadString('\n')
+		input, err = rl.Readline()
+		if err != nil {
+			fmt.Println("Error reading line:", err)
+			return
+		}
 		input = strings.TrimSpace(input)
 
 		if input == "" {
@@ -203,10 +207,16 @@ func main() {
 			continue
 		}
 	}
+
+	// Loop cluster creation for as many times as you specified.
 	for i := 1; i <= clusterCount; i++ {
 		for {
 			fmt.Print("Enter cluster #", i, "'s name.\n")
-			clusterName, _ = reader.ReadString('\n')
+			clusterName, err = rl.Readline()
+			if err != nil {
+				fmt.Println("Error reading line:", err)
+				return
+			}
 			clusterName = strings.TrimSpace(clusterName)
 
 			if clusterName == "" {
@@ -221,17 +231,24 @@ func main() {
 		for {
 			fmt.Print("Select the scheduler you'd like to use by entering its corresponding number. Entering nothing will select Slurm.\n")
 			fmt.Print("[1 Slurm] [2 PBS] [3 LSF] [4 Grid Engine] [5 HTCondor] [6 AWS] [7 Kubernetes]\n")
-			schedulerSelected, _ = reader.ReadString('\n')
+			schedulerSelected, err = rl.Readline()
+			if err != nil {
+				fmt.Println("Error reading line:", err)
+				return
+			}
 			schedulerSelected = strings.TrimSpace(schedulerSelected)
+
 			break
-			// Shut the hell up Go.
-			fmt.Print(scriptsDownloadPath)
 		}
 
 		for {
 			fmt.Print("Select the submissions types you'd like to include by entering its corresponding number. Entering nothing will select both.\n")
 			fmt.Print("[1 Remote] [2 Cluster] [3 Both]\n")
-			submissionType, _ = reader.ReadString('\n')
+			submissionType, err = rl.Readline()
+			if err != nil {
+				fmt.Println("Error reading line:", err)
+				return
+			}
 			submissionType = strings.TrimSpace(strings.ToLower(submissionType))
 
 			if submissionType == "" {
@@ -257,7 +274,11 @@ func main() {
 
 		for {
 			fmt.Print("Enter the number of workers available on the cluster's license. Entering nothing will select 100,000.\n")
-			input, _ = reader.ReadString('\n')
+			input, err = rl.Readline()
+			if err != nil {
+				fmt.Println("Error reading line:", err)
+				return
+			}
 			input = strings.TrimSpace(input)
 
 			if input == "" {
@@ -279,7 +300,11 @@ func main() {
 
 			for {
 				fmt.Print("Does the client have a shared filesystem with the cluster? (y/n)\n")
-				input, _ = reader.ReadString('\n')
+				input, err = rl.Readline()
+				if err != nil {
+					fmt.Println("Error reading line:", err)
+					return
+				}
 				input = strings.TrimSpace(strings.ToLower(input))
 
 				if input == "y" || input == "yes" {
@@ -297,7 +322,11 @@ func main() {
 
 			for {
 				fmt.Print("What is the full filepath of MATLAB on the cluster? (ex: /usr/local/MATLAB/R2023b)\n")
-				clusterMatlabRoot, _ = reader.ReadString('\n')
+				clusterMatlabRoot, err = rl.Readline()
+				if err != nil {
+					fmt.Println("Error reading line:", err)
+					return
+				}
 				clusterMatlabRoot = strings.TrimSpace(clusterMatlabRoot)
 
 				if strings.Contains(clusterMatlabRoot, "/") || strings.Contains(clusterMatlabRoot, "\\") {
@@ -310,7 +339,11 @@ func main() {
 
 			for {
 				fmt.Print("What is the hostname, FQDN, or IP address used to SSH to the cluster?\n")
-				clusterHostname, _ = reader.ReadString('\n')
+				clusterHostname, err = rl.Readline()
+				if err != nil {
+					fmt.Println("Error reading line:", err)
+					return
+				}
 				clusterHostname = strings.TrimSpace(clusterHostname)
 
 				if clusterHostname == "" {
@@ -323,7 +356,11 @@ func main() {
 
 			for {
 				fmt.Print("Where will remote job storage location be on the cluster? Entering nothing will select /home/$User/.matlab/generic_cluster_jobs/" + clusterName + "/$Host\n")
-				remoteJobStorageLocation, _ = reader.ReadString('\n')
+				remoteJobStorageLocation, err = rl.Readline()
+				if err != nil {
+					fmt.Println("Error reading line:", err)
+					return
+				}
 				remoteJobStorageLocation = strings.TrimSpace(remoteJobStorageLocation)
 
 				if strings.Contains(remoteJobStorageLocation, "/") || strings.Contains(clusterMatlabRoot, "\\") {
@@ -336,9 +373,8 @@ func main() {
 					continue
 				}
 			}
-
 		}
-		fmt.Print("Creating integration scripts...\n")
+		fmt.Print("Creating integration scripts for cluster #", i, "...\n")
 		fmt.Print("Finished!\n")
 		fmt.Print("Submitting to GitLab...\n")
 		fmt.Print("Finished!\n")
@@ -412,6 +448,5 @@ func unzipFile(src, dest string) error {
 			return err
 		}
 	}
-
 	return nil
 }
