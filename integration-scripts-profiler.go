@@ -139,6 +139,11 @@ func main() {
 				fmt.Println("Failed to download integration scripts: ", err)
 				continue
 			}
+
+			// Extract ZIP archives.
+			schedulerName := strings.TrimSuffix(fileName, ".zip")
+			unzipPath := filepath.Join(scriptsDownloadPath)
+
 			if strings.Contains(fileName, "kubernetes.zip") {
 				fmt.Println("Latest integration scripts downloaded successfully!")
 			}
