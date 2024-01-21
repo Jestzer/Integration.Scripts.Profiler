@@ -24,10 +24,10 @@ func main() {
 
 	// For reading user input.
 	reader := bufio.NewReader(os.Stdin)
+	var input string
 
 	// Goodies.
-	var input string
-	var defaultTMP string
+	var scriptsDownloadPath string
 	var schedulerSelected string
 	var organizationSelected string
 	var clusterCount int
@@ -38,6 +38,7 @@ func main() {
 	var clusterMatlabRoot string
 	var clusterHostname string
 	var remoteJobStorageLocation string
+	var downloadScriptsOnLanuch bool = true
 
 	// # Add some code that'll load any preferences for the program.
 	// # Add some code that'll allow arrow keys to be used when prompted for user input.
@@ -45,7 +46,7 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 
-	// Start a goroutine to listen for signals.
+	// Start a Goroutine to listen for signals.
 	go func() {
 
 		// Wait for the signal.
@@ -56,18 +57,80 @@ func main() {
 		os.Exit(0)
 	}()
 
-	// Figure out your OS.
+	// Determine your OS.
 	switch userOS := runtime.GOOS; userOS {
 	case "darwin":
-		defaultTMP = "/tmp"
+		scriptsDownloadPath = "/tmp"
 	case "windows":
-		defaultTMP = os.Getenv("TMP")
+		scriptsDownloadPath = os.Getenv("TMP")
 	case "linux":
-		defaultTMP = "/tmp"
+		scriptsDownloadPath = "/tmp"
 	default:
-		defaultTMP = "unknown"
-		fmt.Println(redText("Your operating system is unrecognized. Exiting."))
+		scriptsDownloadPath = "unknown"
+		fmt.Println(redText("\nYour operating system is unrecognized. Exiting."))
 		os.Exit(0)
+	}
+
+	// Determine any user-defined settings.
+	currentDir, err := os.Getwd() // Get the current working directory.
+	if err != nil {
+		fmt.Print(redText("\nError getting current working directory while looking for user settings : ", err, " Default settings will be used instead."))
+		return
+	}
+
+	settingsPath := filepath.Join(currentDir, "settings.txt")
+
+	// Check if the settings file exists.
+	if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+		// No settings found.
+		return
+	} else if err != nil {
+		fmt.Print("\nError checking for user settings: ", err, " Default settings will be used instead.")
+	} else {
+		fmt.Print("\nCustom settings found!")
+		file, err := os.Open(settingsPath)
+		if err != nil {
+			fmt.Println("\nError opening settings file: ", err, " Default settings will be used instead.")
+			return
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+
+			if !strings.HasPrefix(line, "#") {
+				// Process the non-commented line
+				fmt.Println("\nProcessing line: ", line)
+				if strings.HasPrefix(line, "downloadScriptsOnLaunch") {
+					fmt.Println("\nHey there!")
+				}
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			fmt.Println("Error reading settings file:", err)
+		}
+	}
+
+	if downloadScriptsOnLanuch {
+		fmt.Println("Beginning download of integration scripts. Please wait.")
+
+		var integrationScriptsURLs = map[string]string{
+			"https://codeload.github.com/mathworks/matlab-parallel-slurm-plugin/zip/refs/heads/main": "slurm.zip",
+			"https://codeload.github.com/mathworks/matlab-parallel-pbs-plugin/zip/refs/heads/main":   "pbs.zip",
+		}
+
+		for url, fileName := range integrationScriptsURLs {
+			fileName = filepath.Join(scriptsDownloadPath, fileName)
+			err := downloadFile(url, fileName)
+			if err != nil {
+				fmt.Println("Failed to download integration scripts: ", err)
+				continue
+			}
+			fmt.Println("Integration scripts downloaded successfully!")
+		}
 	}
 
 	for {
@@ -110,7 +173,7 @@ func main() {
 		schedulerSelected = strings.TrimSpace(schedulerSelected)
 		break
 		// Shut the hell up Go.
-		fmt.Print(defaultTMP)
+		fmt.Print(scriptsDownloadPath)
 	}
 
 	for {

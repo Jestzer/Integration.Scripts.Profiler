@@ -1,0 +1,6 @@
+# Define your user settings below. Commented out lines will be ignored. Each entry must be on its own line.
+# downloadScriptsOnLaunch = true
+# scriptsDownloadPath = "/Users/james/Downloads/"
+# existingScriptsPath = "/Users/james/Customer-Scripts"
+# accessToken = abc123
+check123
