@@ -14,10 +14,18 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/eiannone/keyboard"
 	"github.com/fatih/color"
 )
 
 func main() {
+	// To handle keyboard input better.
+	err := keyboard.Open()
+	if err != nil {
+		panic(err)
+	}
+	defer keyboard.Close()
+
 	// Colors used across the program.
 	redBackground := color.New(color.BgRed).SprintFunc()
 	redText := color.New(color.FgRed).SprintFunc()
@@ -39,6 +47,7 @@ func main() {
 	var clusterHostname string
 	var remoteJobStorageLocation string
 	var downloadScriptsOnLanuch bool = true
+	var caseNumber int
 
 	// # Add some code that'll load any preferences for the program.
 	// # Add some code that'll allow arrow keys to be used when prompted for user input.
@@ -101,8 +110,8 @@ func main() {
 			line := scanner.Text()
 
 			if !strings.HasPrefix(line, "#") {
-				// Process the non-commented line
-				fmt.Println("\nProcessing line: ", line)
+				// Process uncommented line.
+				fmt.Println("\nProcessing line:", line)
 				if strings.HasPrefix(line, "downloadScriptsOnLaunch") {
 					fmt.Println("\nHey there!")
 				}
@@ -135,15 +144,40 @@ func main() {
 				continue
 			}
 			if strings.Contains(fileName, "kubernetes.zip") {
-				fmt.Println("Integration scripts downloaded successfully!")
+				fmt.Println("Latest integration scripts downloaded successfully!")
 			}
 		}
+	} else {
+		fmt.Print("Integration scripts download skipped per user's settings.")
 	}
 
 	for {
 		fmt.Print("Enter the organization's name.\n")
 		organizationSelected, _ = reader.ReadString('\n')
 		organizationSelected = strings.TrimSpace(organizationSelected)
+
+		for {
+			char, key, err := keyboard.GetKey()
+			if err != nil {
+				panic(err)
+			}
+
+			if key == keyboard.KeyEnter {
+				break
+			}
+
+			if key == keyboard.KeySpace {
+				fmt.Print(" ")
+			} else if key == keyboard.KeyBackspace {
+				fmt.Print("\b \b") // Move cursor back and overwrite with space
+			} else if key == keyboard.KeyArrowLeft {
+				fmt.Print("\033[D") // Move cursor left
+			} else if key == keyboard.KeyArrowRight {
+				fmt.Print("\033[C") // Move cursor right
+			} else {
+				fmt.Print(string(char))
+			}
+		}
 
 		if organizationSelected == "" {
 			fmt.Print(redText("Invalid entry. "))
@@ -154,45 +188,15 @@ func main() {
 	}
 
 	for {
-		fmt.Print("Enter the number of clusters you'd like to make scripts for. 1-6 are accepted. Entering nothing will select 1.\n")
-		fmt.Scan(&clusterCount)
-		break
-	}
+		fmt.Print("Enter the Salesforce Case Number associated with these scripts.\n")
+		input, _ = reader.ReadString('\n')
+		input = strings.TrimSpace(input)
 
-	for {
-		fmt.Print("Enter the cluster's name.\n")
-		clusterName, _ = reader.ReadString('\n')
-		clusterName = strings.TrimSpace(clusterName)
-
-		if clusterName == "" {
-			fmt.Print(redText("Invalid entry. "))
-			continue
-		} else {
+		// Don't accept anything other than numbers.
+		if _, err := strconv.Atoi(input); err == nil {
+			caseNumber, _ = strconv.Atoi(input)
 			break
-		}
-	}
-
-	// waaaahhhh it's too difficult to just say "while".
-	for {
-		fmt.Print("Select the scheduler you'd like to use by entering its corresponding number. Entering nothing will select Slurm.\n")
-		fmt.Print("[1 Slurm] [2 PBS] [3 LSF] [4 Grid Engine] [5 HTCondor] [6 AWS] [7 Kubernetes]\n")
-		schedulerSelected, _ = reader.ReadString('\n')
-		schedulerSelected = strings.TrimSpace(schedulerSelected)
-		break
-		// Shut the hell up Go.
-		fmt.Print(scriptsDownloadPath)
-	}
-
-	for {
-		fmt.Print("Does the cluster allow submissions from remote, cluster, or both places? Entering nothing will select both.\n")
-		submissionType, _ = reader.ReadString('\n')
-		submissionType = strings.TrimSpace(strings.ToLower(submissionType))
-
-		if submissionType == "" {
-			submissionType = "both"
-			break
-		} else if submissionType == "cluster" || submissionType == "remote" || submissionType == "both" {
-			break
+			fmt.Print(caseNumber) // Oh Go, it's okay, I promise, we'll use this shit.
 		} else {
 			fmt.Print(redText("Invalid entry. "))
 			continue
@@ -200,92 +204,164 @@ func main() {
 	}
 
 	for {
-		fmt.Print("Enter the number of workers available on the cluster's license. Entering nothing will select 100,000.\n")
+		fmt.Print("Enter the number of clusters you'd like to make scripts for. Entering nothing will select 1.\n")
 		input, _ = reader.ReadString('\n')
 		input = strings.TrimSpace(input)
 
 		if input == "" {
-			numberOfWorkers = 100000
+			clusterCount = 1
 			break
-			fmt.Print(numberOfWorkers) // Again, Go, shut up.
 		}
 
 		// Don't accept anything other than numbers.
 		if _, err := strconv.Atoi(input); err == nil {
-			numberOfWorkers, _ = strconv.Atoi(input)
+			clusterCount, _ = strconv.Atoi(input)
 			break
 		} else {
 			fmt.Print(redText("Invalid entry. "))
 			continue
 		}
 	}
-	if submissionType == "remote" || submissionType == "both" {
+	for i := 1; i <= clusterCount; i++ {
+		for {
+			fmt.Print("Enter cluster #", i, "'s name.\n")
+			clusterName, _ = reader.ReadString('\n')
+			clusterName = strings.TrimSpace(clusterName)
+
+			if clusterName == "" {
+				fmt.Print(redText("Invalid entry. "))
+				continue
+			} else {
+				break
+			}
+		}
+
+		// waaaahhhh it's too difficult to just say "while".
+		for {
+			fmt.Print("Select the scheduler you'd like to use by entering its corresponding number. Entering nothing will select Slurm.\n")
+			fmt.Print("[1 Slurm] [2 PBS] [3 LSF] [4 Grid Engine] [5 HTCondor] [6 AWS] [7 Kubernetes]\n")
+			schedulerSelected, _ = reader.ReadString('\n')
+			schedulerSelected = strings.TrimSpace(schedulerSelected)
+			break
+			// Shut the hell up Go.
+			fmt.Print(scriptsDownloadPath)
+		}
 
 		for {
-			fmt.Print("Does the client have a shared filesystem with the cluster? (y/n)\n")
+			fmt.Print("Select the submissions types you'd like to include by entering its corresponding number. Entering nothing will select both.\n")
+			fmt.Print("[1 Remote] [2 Cluster] [3 Both]\n")
+			submissionType, _ = reader.ReadString('\n')
+			submissionType = strings.TrimSpace(strings.ToLower(submissionType))
+
+			if submissionType == "" {
+				submissionType = "both"
+				break
+			} else if submissionType == "1" || submissionType == "2" || submissionType == "3" {
+				switch submissionType {
+				case "1":
+					submissionType = "remote"
+				case "2":
+					submissionType = "cluster"
+				case "3":
+					submissionType = "both"
+				}
+				break
+			} else if submissionType == "cluster" || submissionType == "remote" || submissionType == "both" {
+				break
+			} else {
+				fmt.Print(redText("Invalid entry. "))
+				continue
+			}
+		}
+
+		for {
+			fmt.Print("Enter the number of workers available on the cluster's license. Entering nothing will select 100,000.\n")
 			input, _ = reader.ReadString('\n')
-			input = strings.TrimSpace(strings.ToLower(input))
+			input = strings.TrimSpace(input)
 
-			if input == "y" || input == "yes" {
-				hasSharedFileSystem = true
+			if input == "" {
+				numberOfWorkers = 100000
 				break
-				fmt.Print(hasSharedFileSystem) // Again, shut up, Go. It'll be used at some point, I promise.
-			} else if input == "n" || input == "no" {
-				hasSharedFileSystem = false
+				fmt.Print(numberOfWorkers) // Again, Go, shut up.
+			}
+
+			// Don't accept anything other than numbers.
+			if _, err := strconv.Atoi(input); err == nil {
+				numberOfWorkers, _ = strconv.Atoi(input)
 				break
 			} else {
 				fmt.Print(redText("Invalid entry. "))
 				continue
 			}
 		}
+		if submissionType == "remote" || submissionType == "both" {
 
-		for {
-			fmt.Print("What is the full filepath of MATLAB on the cluster? (ex: /usr/local/MATLAB/R2023b)\n")
-			clusterMatlabRoot, _ = reader.ReadString('\n')
-			clusterMatlabRoot = strings.TrimSpace(clusterMatlabRoot)
+			for {
+				fmt.Print("Does the client have a shared filesystem with the cluster? (y/n)\n")
+				input, _ = reader.ReadString('\n')
+				input = strings.TrimSpace(strings.ToLower(input))
 
-			if strings.Contains(clusterMatlabRoot, "/") || strings.Contains(clusterMatlabRoot, "\\") {
-				break
-			} else {
-				fmt.Print(redText("Invalid filepath. "))
-				continue
+				if input == "y" || input == "yes" {
+					hasSharedFileSystem = true
+					break
+					fmt.Print(hasSharedFileSystem) // Again, shut up, Go. It'll be used at some point, I promise.
+				} else if input == "n" || input == "no" {
+					hasSharedFileSystem = false
+					break
+				} else {
+					fmt.Print(redText("Invalid entry. "))
+					continue
+				}
 			}
-		}
 
-		for {
-			fmt.Print("What is the hostname, FQDN, or IP address used to SSH to the cluster?\n")
-			clusterHostname, _ = reader.ReadString('\n')
-			clusterHostname = strings.TrimSpace(clusterHostname)
+			for {
+				fmt.Print("What is the full filepath of MATLAB on the cluster? (ex: /usr/local/MATLAB/R2023b)\n")
+				clusterMatlabRoot, _ = reader.ReadString('\n')
+				clusterMatlabRoot = strings.TrimSpace(clusterMatlabRoot)
 
-			if clusterHostname == "" {
-				fmt.Print(redText("Invalid entry. "))
-				continue
-			} else {
-				break
+				if strings.Contains(clusterMatlabRoot, "/") || strings.Contains(clusterMatlabRoot, "\\") {
+					break
+				} else {
+					fmt.Print(redText("Invalid filepath. "))
+					continue
+				}
 			}
-		}
 
-		for {
-			fmt.Print("Where will remote job storage location be on the cluster? Entering nothing will select /home/$User/.matlab/generic_cluster_jobs/$ClusterName/$Host\n")
-			remoteJobStorageLocation, _ = reader.ReadString('\n')
-			remoteJobStorageLocation = strings.TrimSpace(remoteJobStorageLocation)
+			for {
+				fmt.Print("What is the hostname, FQDN, or IP address used to SSH to the cluster?\n")
+				clusterHostname, _ = reader.ReadString('\n')
+				clusterHostname = strings.TrimSpace(clusterHostname)
 
-			if strings.Contains(remoteJobStorageLocation, "/") || strings.Contains(clusterMatlabRoot, "\\") {
-				break
-			} else if remoteJobStorageLocation == "" {
-				remoteJobStorageLocation = "/home/$USER/.matlab/generic_cluster_jobs/" + clusterName + "/$HOST"
-				break
-			} else {
-				fmt.Print(redText("Invalid filepath. "))
-				continue
+				if clusterHostname == "" {
+					fmt.Print(redText("Invalid entry. "))
+					continue
+				} else {
+					break
+				}
 			}
-		}
 
+			for {
+				fmt.Print("Where will remote job storage location be on the cluster? Entering nothing will select /home/$User/.matlab/generic_cluster_jobs/" + clusterName + "/$Host\n")
+				remoteJobStorageLocation, _ = reader.ReadString('\n')
+				remoteJobStorageLocation = strings.TrimSpace(remoteJobStorageLocation)
+
+				if strings.Contains(remoteJobStorageLocation, "/") || strings.Contains(clusterMatlabRoot, "\\") {
+					break
+				} else if remoteJobStorageLocation == "" {
+					remoteJobStorageLocation = "/home/$USER/.matlab/generic_cluster_jobs/" + clusterName + "/$HOST"
+					break
+				} else {
+					fmt.Print(redText("Invalid filepath. "))
+					continue
+				}
+			}
+
+		}
+		fmt.Print("Creating integration scripts...\n")
+		fmt.Print("Finished!\n")
+		fmt.Print("Submitting to GitLab...\n")
+		fmt.Print("Finished!\n")
 	}
-	fmt.Print("Creating integration scripts...\n")
-	fmt.Print("Finished!\n")
-	fmt.Print("Submitting to GitLab...\n")
-	fmt.Print("Finished!\n")
 }
 
 // Function to download a file from a given URL and save it to the specified path.
