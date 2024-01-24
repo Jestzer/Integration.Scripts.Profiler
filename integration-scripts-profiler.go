@@ -132,20 +132,36 @@ func main() {
 			"https://codeload.github.com/mathworks/matlab-parallel-kubernetes-plugin/zip/refs/heads/main": "kubernetes.zip",
 		}
 
-		for url, fileName := range integrationScriptsURLs {
-			fileName = filepath.Join(scriptsDownloadPath, fileName)
-			err := downloadFile(url, fileName)
+		for url, zipArchive := range integrationScriptsURLs {
+			zipArchivePath := filepath.Join(scriptsDownloadPath, zipArchive)
+			err := downloadFile(url, zipArchivePath)
 			if err != nil {
 				fmt.Println("Failed to download integration scripts: ", err)
 				continue
 			}
 
 			// Extract ZIP archives.
-			schedulerName := strings.TrimSuffix(fileName, ".zip")
-			unzipPath := filepath.Join(scriptsDownloadPath)
+			schedulerName := strings.TrimSuffix(zipArchive, ".zip")
+			unzipPath := filepath.Join(scriptsDownloadPath, schedulerName)
 
-			if strings.Contains(fileName, "kubernetes.zip") {
-				fmt.Println("Latest integration scripts downloaded successfully!")
+			// Check if the integration scripts directory already exists. Delete it if it is.
+			if _, err := os.Stat(unzipPath); err == nil {
+
+				err := os.RemoveAll(unzipPath)
+				if err != nil {
+					fmt.Println(redText("Failed to delete the existing integration scripts directory:", err))
+					continue
+				}
+			}
+
+			err = unzipFile(zipArchivePath, scriptsDownloadPath)
+			if err != nil {
+				fmt.Println(redText("Failed to extract integration scripts:", err))
+				continue
+			}
+
+			if strings.Contains(zipArchivePath, "kubernetes.zip") {
+				fmt.Println("Latest integration scripts downloaded and extracted successfully!")
 			}
 		}
 	} else {
