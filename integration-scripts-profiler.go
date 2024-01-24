@@ -32,7 +32,10 @@ func main() {
 
 	// Goodies.
 	var input string
-	var scriptsDownloadPath string
+	var scriptsPath string
+	var accessToken string
+	var downloadScriptsOnLanuch bool = true
+	var caseNumber int
 	var schedulerSelected string
 	var organizationSelected string
 	var clusterCount int
@@ -43,8 +46,6 @@ func main() {
 	var clusterMatlabRoot string
 	var clusterHostname string
 	var remoteJobStorageLocation string
-	var downloadScriptsOnLanuch bool = true
-	var caseNumber int
 
 	// # Add some code that'll load any preferences for the program.
 	// Setup for better Ctrl+C messaging. This is a channel to receive OS signals.
@@ -58,21 +59,21 @@ func main() {
 		<-signalChan
 
 		// Handle the signal by exiting the program.
-		fmt.Println(redBackground("\nExiting from user input..."))
+		fmt.Print(redBackground("\nExiting from user input..."))
 		os.Exit(0)
 	}()
 
 	// Determine your OS.
 	switch userOS := runtime.GOOS; userOS {
 	case "darwin":
-		scriptsDownloadPath = "/tmp"
+		scriptsPath = "/tmp"
 	case "windows":
-		scriptsDownloadPath = os.Getenv("TMP")
+		scriptsPath = os.Getenv("TMP")
 	case "linux":
-		scriptsDownloadPath = "/tmp"
+		scriptsPath = "/tmp"
 	default:
-		scriptsDownloadPath = "unknown"
-		fmt.Println(redText("\nYour operating system is unrecognized. Exiting."))
+		scriptsPath = "unknown"
+		fmt.Print(redText("\nYour operating system is unrecognized. Exiting."))
 		os.Exit(0)
 	}
 
@@ -89,12 +90,12 @@ func main() {
 			// No settings found.
 			return
 		} else if err != nil {
-			fmt.Print("\nError checking for user settings: ", err, " Default settings will be used instead.")
+			fmt.Print(redText("\nError checking for user settings: ", err, " Default settings will be used instead."))
 		} else {
-			fmt.Print("\nCustom settings found!")
+			fmt.Print("\nCustom settings found!\n")
 			file, err := os.Open(settingsPath)
 			if err != nil {
-				fmt.Println("\nError opening settings file: ", err, " Default settings will be used instead.")
+				fmt.Print(redText("\nError opening settings file: ", err, " Default settings will be used instead."))
 				return
 			}
 			defer file.Close()
@@ -105,24 +106,67 @@ func main() {
 				line := scanner.Text()
 
 				if !strings.HasPrefix(line, "#") {
-					// Process uncommented line.
-					fmt.Println("\nProcessing line:", line)
-					if strings.HasPrefix(line, "downloadScriptsOnLaunch") {
-						fmt.Println("\nHey there!")
+					if strings.HasPrefix(strings.ToLower(line), "downloadscriptsonlaunch") {
+						if strings.Contains(strings.ToLower(line), "false") {
+							downloadScriptsOnLanuch = false
+							fmt.Print("\nA new set of integration scripts will not be downloaded per your settings.")
+						}
+
+					} else if strings.HasPrefix(line, "scriptsPath =") || strings.HasPrefix(line, "scriptsPath=") {
+						scriptsPath = strings.TrimPrefix(line, "scriptsPath =")
+						scriptsPath = strings.TrimPrefix(scriptsPath, "scriptsPath=")
+						scriptsPath = strings.TrimSpace(scriptsPath)
+						scriptsPath = strings.Trim(scriptsPath, "\"")
+
+						_, err := os.Stat(scriptsPath) // Do you actually exist? Does anything actually exist, man?
+						if err != nil {
+							fmt.Print(redText("\nThe custom scripts path you've specified does not exist. Please adjust your settings accordingly."))
+							os.Exit(0)
+						}
+
+						// If you want your own path, that's fine, but you gotta actually have the scripts in there.
+						if !downloadScriptsOnLanuch {
+							for i := 0; i < 2; i++ {
+								var scheduler string
+
+								switch i {
+								case 0:
+									scheduler = "slurm"
+								case 1:
+									scheduler = "pbs"
+								}
+								schedulerDirectoryName := "matlab-parallel-" + scheduler + "-plugin-main"
+								schedulerPath := filepath.Join(scriptsPath, schedulerDirectoryName)
+								if _, err := os.Stat(schedulerPath); err != nil {
+									fmt.Print(redText("\nThe path you've specified is missing the needed integration scripts folder \"matlab-parallel-", scheduler, "-plugin-main\"."))
+									os.Exit(0)
+								}
+
+							}
+						}
+
+						fmt.Print("\nA custom integration scripts download path has been set to ", scriptsPath)
+
+					} else if strings.HasPrefix(line, "accessToken =") || strings.HasPrefix(line, "accessToken=") {
+						accessToken = strings.TrimPrefix(line, "accessToken =")
+						accessToken = strings.TrimPrefix(accessToken, "accessToken=")
+						accessToken = strings.TrimSpace(accessToken)
+						accessToken = strings.Trim(accessToken, "\"")
+						fmt.Print("\nYour access token has been set to ", accessToken)
 					}
 				}
 			}
 
 			if err := scanner.Err(); err != nil {
-				fmt.Println("Error reading settings file:", err)
+				fmt.Print(redText("\nError reading settings file:", err, " Default settings will be used instead."))
 			}
 		}
 	}
 
 	if downloadScriptsOnLanuch {
-		fmt.Println("Beginning download of integration scripts. Please wait.")
+		fmt.Print("\nBeginning download of integration scripts. Please wait.")
 
-		var integrationScriptsURLs = map[string]string{
+		var scriptsURLs = map[string]string{
 			"https://codeload.github.com/mathworks/matlab-parallel-slurm-plugin/zip/refs/heads/main":      "slurm.zip",
 			"https://codeload.github.com/mathworks/matlab-parallel-pbs-plugin/zip/refs/heads/main":        "pbs.zip",
 			"https://codeload.github.com/mathworks/matlab-parallel-lsf-plugin/zip/refs/heads/main":        "lsf.zip",
@@ -132,53 +176,53 @@ func main() {
 			"https://codeload.github.com/mathworks/matlab-parallel-kubernetes-plugin/zip/refs/heads/main": "kubernetes.zip",
 		}
 
-		for url, zipArchive := range integrationScriptsURLs {
-			zipArchivePath := filepath.Join(scriptsDownloadPath, zipArchive)
+		for url, zipArchive := range scriptsURLs {
+			zipArchivePath := filepath.Join(scriptsPath, zipArchive)
 			err := downloadFile(url, zipArchivePath)
 			if err != nil {
-				fmt.Println("Failed to download integration scripts: ", err)
+				fmt.Print("Failed to download integration scripts: ", err)
 				continue
 			}
 
 			// Extract ZIP archives.
 			schedulerName := strings.TrimSuffix(zipArchive, ".zip")
-			unzipPath := filepath.Join(scriptsDownloadPath, schedulerName)
+			unzipPath := filepath.Join(scriptsPath, schedulerName)
 
 			// Check if the integration scripts directory already exists. Delete it if it is.
 			if _, err := os.Stat(unzipPath); err == nil {
 
 				err := os.RemoveAll(unzipPath)
 				if err != nil {
-					fmt.Println(redText("Failed to delete the existing integration scripts directory:", err))
+					fmt.Print(redText("Failed to delete the existing integration scripts directory:", err))
 					continue
 				}
 			}
 
-			err = unzipFile(zipArchivePath, scriptsDownloadPath)
+			err = unzipFile(zipArchivePath, scriptsPath)
 			if err != nil {
-				fmt.Println(redText("Failed to extract integration scripts:", err))
+				fmt.Print(redText("Failed to extract integration scripts:", err))
 				continue
 			}
 
 			if strings.Contains(zipArchivePath, "kubernetes.zip") {
-				fmt.Println("Latest integration scripts downloaded and extracted successfully!")
+				fmt.Print("Latest integration scripts downloaded and extracted successfully!")
 			}
 		}
 	} else {
-		fmt.Print("Integration scripts download skipped per user's settings.")
+		fmt.Print("\nIntegration scripts download skipped per user's settings.")
 	}
 
 	for {
-		fmt.Print("Enter the organization's name.\n")
+		fmt.Print("\nEnter the organization's name.\n")
 		organizationSelected, err = rl.Readline()
 		if err != nil { // Handle error. For example, if user enters Ctrl+C.
-			fmt.Println("Error reading line:", err)
+			fmt.Print(redText("Error reading line:", err))
 			return
 		}
 		organizationSelected = strings.TrimSpace(organizationSelected)
 
 		if organizationSelected == "" {
-			fmt.Print("Invalid entry. ")
+			fmt.Print(redText("Invalid entry. "))
 			continue
 		} else {
 			break
@@ -189,7 +233,7 @@ func main() {
 		fmt.Print("Enter the Salesforce Case Number associated with these scripts.\n")
 		input, err = rl.Readline()
 		if err != nil {
-			fmt.Println("Error reading line:", err)
+			fmt.Print(redText("Error reading line:", err))
 			return
 		}
 		input = strings.TrimSpace(input)
@@ -209,7 +253,7 @@ func main() {
 		fmt.Print("Enter the number of clusters you'd like to make scripts for. Entering nothing will select 1.\n")
 		input, err = rl.Readline()
 		if err != nil {
-			fmt.Println("Error reading line:", err)
+			fmt.Print(redText("Error reading line:", err))
 			return
 		}
 		input = strings.TrimSpace(input)
@@ -235,7 +279,7 @@ func main() {
 			fmt.Print("Enter cluster #", i, "'s name.\n")
 			clusterName, err = rl.Readline()
 			if err != nil {
-				fmt.Println("Error reading line:", err)
+				fmt.Print(redText("Error reading line:", err))
 				return
 			}
 			clusterName = strings.TrimSpace(clusterName)
@@ -254,11 +298,10 @@ func main() {
 			fmt.Print("[1 Slurm] [2 PBS] [3 LSF] [4 Grid Engine] [5 HTCondor] [6 AWS] [7 Kubernetes]\n")
 			schedulerSelected, err = rl.Readline()
 			if err != nil {
-				fmt.Println("Error reading line:", err)
+				fmt.Print(redText("Error reading line:", err))
 				return
 			}
 			schedulerSelected = strings.TrimSpace(schedulerSelected)
-
 			break
 		}
 
@@ -267,7 +310,7 @@ func main() {
 			fmt.Print("[1 Remote] [2 Cluster] [3 Both]\n")
 			submissionType, err = rl.Readline()
 			if err != nil {
-				fmt.Println("Error reading line:", err)
+				fmt.Print(redText("Error reading line:", err))
 				return
 			}
 			submissionType = strings.TrimSpace(strings.ToLower(submissionType))
@@ -297,7 +340,7 @@ func main() {
 			fmt.Print("Enter the number of workers available on the cluster's license. Entering nothing will select 100,000.\n")
 			input, err = rl.Readline()
 			if err != nil {
-				fmt.Println("Error reading line:", err)
+				fmt.Print(redText("Error reading line:", err))
 				return
 			}
 			input = strings.TrimSpace(input)
@@ -318,12 +361,11 @@ func main() {
 			}
 		}
 		if submissionType == "remote" || submissionType == "both" {
-
 			for {
 				fmt.Print("Does the client have a shared filesystem with the cluster? (y/n)\n")
 				input, err = rl.Readline()
 				if err != nil {
-					fmt.Println("Error reading line:", err)
+					fmt.Print(redText("Error reading line:", err))
 					return
 				}
 				input = strings.TrimSpace(strings.ToLower(input))
@@ -345,7 +387,7 @@ func main() {
 				fmt.Print("What is the full filepath of MATLAB on the cluster? (ex: /usr/local/MATLAB/R2023b)\n")
 				clusterMatlabRoot, err = rl.Readline()
 				if err != nil {
-					fmt.Println("Error reading line:", err)
+					fmt.Print(redText("Error reading line:", err))
 					return
 				}
 				clusterMatlabRoot = strings.TrimSpace(clusterMatlabRoot)
@@ -362,7 +404,7 @@ func main() {
 				fmt.Print("What is the hostname, FQDN, or IP address used to SSH to the cluster?\n")
 				clusterHostname, err = rl.Readline()
 				if err != nil {
-					fmt.Println("Error reading line:", err)
+					fmt.Print(redText("Error reading line:", err))
 					return
 				}
 				clusterHostname = strings.TrimSpace(clusterHostname)
@@ -379,7 +421,7 @@ func main() {
 				fmt.Print("Where will remote job storage location be on the cluster? Entering nothing will select /home/$User/.matlab/generic_cluster_jobs/" + clusterName + "/$Host\n")
 				remoteJobStorageLocation, err = rl.Readline()
 				if err != nil {
-					fmt.Println("Error reading line:", err)
+					fmt.Print(redText("Error reading line:", err))
 					return
 				}
 				remoteJobStorageLocation = strings.TrimSpace(remoteJobStorageLocation)
