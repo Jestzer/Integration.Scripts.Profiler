@@ -1,4 +1,4 @@
 # Define your user settings below. Commented out lines will be ignored. Each entry must be on its own line.
 downloadScriptsOnLaunch = true
-#scriptsPath = "C:\Users\jbuonopa\Downloads"
+#scriptsPath = "C:\Users\jbuonopa\Downloads\"
 accessToken = abc123

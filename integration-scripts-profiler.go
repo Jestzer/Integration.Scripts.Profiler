@@ -92,7 +92,7 @@ func main() {
 		} else if err != nil {
 			fmt.Print(redText("\nError checking for user settings: ", err, " Default settings will be used instead."))
 		} else {
-			fmt.Print("\nCustom settings found!\n")
+			fmt.Print("\nCustom settings found!")
 			file, err := os.Open(settingsPath)
 			if err != nil {
 				fmt.Print(redText("\nError opening settings file: ", err, " Default settings will be used instead."))
@@ -120,28 +120,19 @@ func main() {
 
 						_, err := os.Stat(scriptsPath) // Do you actually exist? Does anything actually exist, man?
 						if err != nil {
-							fmt.Print(redText("\nThe custom scripts path you've specified does not exist. Please adjust your settings accordingly."))
+							fmt.Print(redText("\nThe custom scripts path you've specified, \"", scriptsPath, " does not exist. Please adjust your settings accordingly."))
 							os.Exit(0)
 						}
 
-						// If you want your own path, that's fine, but you gotta actually have the scripts in there.
 						if !downloadScriptsOnLanuch {
-							for i := 0; i < 2; i++ {
-								var scheduler string
-
-								switch i {
-								case 0:
-									scheduler = "slurm"
-								case 1:
-									scheduler = "pbs"
-								}
+							schedulers := []string{"slurm", "pbs", "lsf", "gridengine", "htcondor", "awsbatch", "kubernetes"}
+							for _, scheduler := range schedulers {
 								schedulerDirectoryName := "matlab-parallel-" + scheduler + "-plugin-main"
 								schedulerPath := filepath.Join(scriptsPath, schedulerDirectoryName)
 								if _, err := os.Stat(schedulerPath); err != nil {
-									fmt.Print(redText("\nThe path you've specified is missing the needed integration scripts folder \"matlab-parallel-", scheduler, "-plugin-main\"."))
+									fmt.Printf(redText("\nThe path you've specified is missing the needed integration scripts folder \"%s\".\n"), schedulerDirectoryName)
 									os.Exit(0)
 								}
-
 							}
 						}
 
@@ -180,7 +171,7 @@ func main() {
 			zipArchivePath := filepath.Join(scriptsPath, zipArchive)
 			err := downloadFile(url, zipArchivePath)
 			if err != nil {
-				fmt.Print("Failed to download integration scripts: ", err)
+				fmt.Print(redText("\nFailed to download integration scripts: ", err))
 				continue
 			}
 
@@ -193,14 +184,14 @@ func main() {
 
 				err := os.RemoveAll(unzipPath)
 				if err != nil {
-					fmt.Print(redText("Failed to delete the existing integration scripts directory:", err))
+					fmt.Print(redText("\nFailed to delete the existing integration scripts directory:", err))
 					continue
 				}
 			}
 
 			err = unzipFile(zipArchivePath, scriptsPath)
 			if err != nil {
-				fmt.Print(redText("Failed to extract integration scripts:", err))
+				fmt.Print(redText("\nFailed to extract integration scripts:", err))
 				continue
 			}
 
