@@ -2,3 +2,4 @@
 downloadScriptsOnLaunch = true
 #scriptsPath = "C:\Users\jbuonopa\Downloads\"
 accessToken = abc123
+gitlabPath = C:\Gitlab

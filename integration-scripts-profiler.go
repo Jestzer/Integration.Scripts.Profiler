@@ -36,6 +36,7 @@ func main() {
 	var accessToken string
 	var downloadScriptsOnLanuch bool = true
 	var caseNumber int
+	var gitlabPath string
 	var schedulerSelected string
 	var organizationSelected string
 	var clusterCount int
@@ -144,6 +145,12 @@ func main() {
 						accessToken = strings.TrimSpace(accessToken)
 						accessToken = strings.Trim(accessToken, "\"")
 						fmt.Print("\nYour access token has been set to ", accessToken)
+					} else if strings.HasPrefix(line, "gitlabPath =") || strings.HasPrefix(line, "gitlabPath=") {
+						gitlabPath = strings.TrimPrefix(line, "gitlabPath =")
+						gitlabPath = strings.TrimPrefix(gitlabPath, "gitlabPath=")
+						gitlabPath = strings.TrimSpace(gitlabPath)
+						gitlabPath = strings.Trim(gitlabPath, "\"")
+						fmt.Print("\nYour GitLab path has been set to ", gitlabPath)
 					}
 				}
 			}
@@ -206,8 +213,12 @@ func main() {
 	for {
 		fmt.Print("\nEnter the organization's name.\n")
 		organizationSelected, err = rl.Readline()
-		if err != nil { // Handle error. For example, if user enters Ctrl+C.
-			fmt.Print(redText("Error reading line:", err))
+		if err != nil {
+			if err.Error() == "Interrupt" {
+				fmt.Println(redText("Exiting from user input."))
+			} else {
+				fmt.Print(redText("Error reading line:", err))
+			}
 			return
 		}
 		organizationSelected = strings.TrimSpace(organizationSelected)
@@ -221,15 +232,23 @@ func main() {
 	}
 
 	for {
-		fmt.Print("Enter the Salesforce Case Number associated with these scripts.\n")
+		fmt.Print("Enter the Salesforce Case Number associated with these scripts. Press Enter to skip.\n")
 		input, err = rl.Readline()
 		if err != nil {
-			fmt.Print(redText("Error reading line:", err))
+			if err.Error() == "Interrupt" {
+				fmt.Println(redText("Exiting from user input."))
+			} else {
+				fmt.Print(redText("Error reading line:", err))
+			}
 			return
 		}
 		input = strings.TrimSpace(input)
 
-		// Don't accept anything other than numbers.
+		// Don't accept anything other than numbers and blank input.
+		if input == "" {
+			break
+		}
+
 		if _, err := strconv.Atoi(input); err == nil {
 			caseNumber, _ = strconv.Atoi(input)
 			break
@@ -244,7 +263,11 @@ func main() {
 		fmt.Print("Enter the number of clusters you'd like to make scripts for. Entering nothing will select 1.\n")
 		input, err = rl.Readline()
 		if err != nil {
-			fmt.Print(redText("Error reading line:", err))
+			if err.Error() == "Interrupt" {
+				fmt.Println(redText("Exiting from user input."))
+			} else {
+				fmt.Print(redText("Error reading line:", err))
+			}
 			return
 		}
 		input = strings.TrimSpace(input)
@@ -270,7 +293,11 @@ func main() {
 			fmt.Print("Enter cluster #", i, "'s name.\n")
 			clusterName, err = rl.Readline()
 			if err != nil {
-				fmt.Print(redText("Error reading line:", err))
+				if err.Error() == "Interrupt" {
+					fmt.Println(redText("Exiting from user input."))
+				} else {
+					fmt.Print(redText("Error reading line:", err))
+				}
 				return
 			}
 			clusterName = strings.TrimSpace(clusterName)
@@ -289,7 +316,11 @@ func main() {
 			fmt.Print("[1 Slurm] [2 PBS] [3 LSF] [4 Grid Engine] [5 HTCondor] [6 AWS] [7 Kubernetes]\n")
 			schedulerSelected, err = rl.Readline()
 			if err != nil {
-				fmt.Print(redText("Error reading line:", err))
+				if err.Error() == "Interrupt" {
+					fmt.Println(redText("Exiting from user input."))
+				} else {
+					fmt.Print(redText("Error reading line:", err))
+				}
 				return
 			}
 			schedulerSelected = strings.TrimSpace(schedulerSelected)
@@ -301,7 +332,11 @@ func main() {
 			fmt.Print("[1 Remote] [2 Cluster] [3 Both]\n")
 			submissionType, err = rl.Readline()
 			if err != nil {
-				fmt.Print(redText("Error reading line:", err))
+				if err.Error() == "Interrupt" {
+					fmt.Println(redText("Exiting from user input."))
+				} else {
+					fmt.Print(redText("Error reading line:", err))
+				}
 				return
 			}
 			submissionType = strings.TrimSpace(strings.ToLower(submissionType))
@@ -331,7 +366,11 @@ func main() {
 			fmt.Print("Enter the number of workers available on the cluster's license. Entering nothing will select 100,000.\n")
 			input, err = rl.Readline()
 			if err != nil {
-				fmt.Print(redText("Error reading line:", err))
+				if err.Error() == "Interrupt" {
+					fmt.Println(redText("Exiting from user input."))
+				} else {
+					fmt.Print(redText("Error reading line:", err))
+				}
 				return
 			}
 			input = strings.TrimSpace(input)
@@ -356,7 +395,11 @@ func main() {
 				fmt.Print("Does the client have a shared filesystem with the cluster? (y/n)\n")
 				input, err = rl.Readline()
 				if err != nil {
-					fmt.Print(redText("Error reading line:", err))
+					if err.Error() == "Interrupt" {
+						fmt.Println(redText("Exiting from user input."))
+					} else {
+						fmt.Print(redText("Error reading line:", err))
+					}
 					return
 				}
 				input = strings.TrimSpace(strings.ToLower(input))
@@ -378,7 +421,11 @@ func main() {
 				fmt.Print("What is the full filepath of MATLAB on the cluster? (ex: /usr/local/MATLAB/R2023b)\n")
 				clusterMatlabRoot, err = rl.Readline()
 				if err != nil {
-					fmt.Print(redText("Error reading line:", err))
+					if err.Error() == "Interrupt" {
+						fmt.Println(redText("Exiting from user input."))
+					} else {
+						fmt.Print(redText("Error reading line:", err))
+					}
 					return
 				}
 				clusterMatlabRoot = strings.TrimSpace(clusterMatlabRoot)
@@ -395,7 +442,11 @@ func main() {
 				fmt.Print("What is the hostname, FQDN, or IP address used to SSH to the cluster?\n")
 				clusterHostname, err = rl.Readline()
 				if err != nil {
-					fmt.Print(redText("Error reading line:", err))
+					if err.Error() == "Interrupt" {
+						fmt.Println(redText("Exiting from user input."))
+					} else {
+						fmt.Print(redText("Error reading line:", err))
+					}
 					return
 				}
 				clusterHostname = strings.TrimSpace(clusterHostname)
@@ -412,7 +463,11 @@ func main() {
 				fmt.Print("Where will remote job storage location be on the cluster? Entering nothing will select /home/$User/.matlab/generic_cluster_jobs/" + clusterName + "/$Host\n")
 				remoteJobStorageLocation, err = rl.Readline()
 				if err != nil {
-					fmt.Print(redText("Error reading line:", err))
+					if err.Error() == "Interrupt" {
+						fmt.Println(redText("Exiting from user input."))
+					} else {
+						fmt.Print(redText("Error reading line:", err))
+					}
 					return
 				}
 				remoteJobStorageLocation = strings.TrimSpace(remoteJobStorageLocation)
@@ -429,6 +484,7 @@ func main() {
 			}
 		}
 		fmt.Print("Creating integration scripts for cluster #", i, "...\n")
+
 		fmt.Print("Finished!\n")
 		fmt.Print("Submitting to GitLab...\n")
 		fmt.Print("Finished!\n")
@@ -468,8 +524,7 @@ func unzipFile(src, dest string) error {
 	for _, file := range reader.File {
 		path := filepath.Join(dest, file.Name)
 
-		// Reconstruct the file path on Windows to ensure proper subdirectories are created.
-		// Don't know why other OSes don't need this.
+		// Reconstruct the file path on Windows to ensure proper subdirectories are created. Don't know why other OSes don't need this.
 		if runtime.GOOS == "windows" {
 			path = filepath.Join(dest, file.Name)
 			path = filepath.FromSlash(path)
