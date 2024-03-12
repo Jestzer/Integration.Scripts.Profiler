@@ -150,7 +150,14 @@ func main() {
 						gitlabPath = strings.TrimPrefix(gitlabPath, "gitlabPath=")
 						gitlabPath = strings.TrimSpace(gitlabPath)
 						gitlabPath = strings.Trim(gitlabPath, "\"")
-						fmt.Print("\nYour GitLab path has been set to ", gitlabPath)
+
+						// Check if the path exists.
+						if _, err := os.Stat(gitlabPath); os.IsNotExist(err) {
+							fmt.Println("\nThe specified GitLab path does not exist:", gitlabPath, ". It will not be used.")
+							gitlabPath = ""
+						} else {
+							fmt.Print("\nYour GitLab path has been set to ", gitlabPath)
+						}
 					}
 				}
 			}
