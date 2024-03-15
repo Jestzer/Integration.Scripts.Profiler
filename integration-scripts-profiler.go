@@ -18,6 +18,23 @@ import (
 	"github.com/fatih/color"
 )
 
+type FolderCompleter struct {
+	Folders []string
+}
+
+func (f *FolderCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
+	prefix := string(line[:pos]) // Ensure we're only considering the part of the line up to the cursor.
+	for _, folder := range f.Folders {
+		if strings.HasPrefix(folder, prefix) {
+			// Append only the remaining part of the folder name beyond the prefix.
+			remainingPart := folder[len(prefix):]
+			newLine = append(newLine, []rune(remainingPart))
+		}
+	}
+	length = len(prefix)
+	return
+}
+
 func main() {
 	// To handle keyboard input better.
 	rl, err := readline.New("> ")
@@ -59,7 +76,7 @@ func main() {
 		// Wait for the signal.
 		<-signalChan
 
-		// Handle the signal by exiting the program.
+		// Handle the signal by exiting the program and reporting it as so.
 		fmt.Print(redBackground("\nExiting from user input..."))
 		os.Exit(0)
 	}()
@@ -88,7 +105,7 @@ func main() {
 
 		// Check if the settings file exists.
 		if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
-			// No settings found.
+			// No settings file found.
 			return
 		} else if err != nil {
 			fmt.Print(redText("\nError checking for user settings: ", err, " Default settings will be used instead."))
@@ -185,7 +202,7 @@ func main() {
 			zipArchivePath := filepath.Join(scriptsPath, zipArchive)
 			err := downloadFile(url, zipArchivePath)
 			if err != nil {
-				fmt.Print(redText("\nFailed to download integration scripts: ", err))
+				fmt.Print(redText("\nFailed to download the integration scripts: ", err))
 				continue
 			}
 
@@ -210,12 +227,36 @@ func main() {
 			}
 
 			if strings.Contains(zipArchivePath, "kubernetes.zip") {
-				fmt.Print("Latest integration scripts downloaded and extracted successfully!")
+				fmt.Print("\nLatest integration scripts downloaded and extracted successfully!")
 			}
 		}
 	} else {
 		fmt.Print("\nIntegration scripts download skipped per user's settings.")
 	}
+
+	// List existing engagements and setup auto-completion.
+	var engagementFolders []string
+	if gitlabPath != "" {
+		customerEngagementsPath := filepath.Join(gitlabPath, "Customer-Engagements")
+		if _, err := os.Stat(customerEngagementsPath); !os.IsNotExist(err) {
+			files, err := os.ReadDir(customerEngagementsPath)
+			if err != nil {
+				fmt.Println(redText("Error reading directory:", err))
+			} else {
+				fmt.Print("\nExisting engagements found:")
+				for _, f := range files {
+					if f.IsDir() {
+						engagementFolders = append(engagementFolders, f.Name())
+						fmt.Println("\n -", f.Name())
+					}
+				}
+			}
+		}
+	}
+
+	// Define auto-completer.
+	completer := &FolderCompleter{Folders: engagementFolders}
+	rl.Config.AutoComplete = completer
 
 	for {
 		fmt.Print("\nEnter the organization's name.\n")
