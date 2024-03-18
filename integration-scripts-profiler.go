@@ -320,12 +320,12 @@ func main() {
 		}
 		input = strings.TrimSpace(input)
 
+		// Don't accept anything other than numbers and blank input.
 		if input == "" {
 			clusterCount = 1
 			break
 		}
 
-		// Don't accept anything other than numbers.
 		if _, err := strconv.Atoi(input); err == nil {
 			clusterCount, _ = strconv.Atoi(input)
 			break
