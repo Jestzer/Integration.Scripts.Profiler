@@ -51,7 +51,9 @@ func main() {
 	var input string
 	var scriptsPath string
 	var accessToken string
+	var gitRepoURL string
 	var downloadScriptsOnLanuch bool = true
+	var useCaseNumber bool = true
 	var caseNumber int
 	var gitlabPath string
 	var schedulerSelected string
@@ -65,7 +67,6 @@ func main() {
 	var clusterHostname string
 	var remoteJobStorageLocation string
 
-	// # Add some code that'll load any preferences for the program.
 	// Setup for better Ctrl+C messaging. This is a channel to receive OS signals.
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
@@ -175,6 +176,19 @@ func main() {
 						} else {
 							fmt.Print("\nYour GitLab path has been set to ", gitlabPath)
 						}
+					} else if strings.HasPrefix(line, "gitRepoURL =") || strings.HasPrefix(line, "gitRepoURL=") {
+						gitRepoURL = strings.TrimPrefix(line, "gitRepoURL =")
+						gitRepoURL = strings.TrimPrefix(gitRepoURL, "gitRepoURL=")
+						gitRepoURL = strings.TrimSpace(gitRepoURL)
+						gitRepoURL = strings.Trim(gitRepoURL, "\"")
+						fmt.Print("\nYour Git Repo URL has been set to ", gitRepoURL)
+					} else if strings.HasPrefix(strings.ToLower(line), "usecasenumber") {
+						if strings.Contains(strings.ToLower(line), "false") {
+							useCaseNumber = false
+							fmt.Print("\nPer your settings, you will not be prompted to fill in a Case Number.")
+						}
+					} else {
+						fmt.Print(redText("\nUnrecognized setting detected. The line in question has this content: ", line))
 					}
 				}
 			}
@@ -278,32 +292,33 @@ func main() {
 			break
 		}
 	}
-
-	for {
-		fmt.Print("Enter the Salesforce Case Number associated with these scripts. Press Enter to skip.\n")
-		input, err = rl.Readline()
-		if err != nil {
-			if err.Error() == "Interrupt" {
-				fmt.Println(redText("Exiting from user input."))
-			} else {
-				fmt.Print(redText("Error reading line:", err))
+	if useCaseNumber {
+		for {
+			fmt.Print("Enter the Salesforce Case Number associated with these scripts. Press Enter to skip.\n")
+			input, err = rl.Readline()
+			if err != nil {
+				if err.Error() == "Interrupt" {
+					fmt.Println(redText("Exiting from user input."))
+				} else {
+					fmt.Print(redText("Error reading line:", err))
+				}
+				return
 			}
-			return
-		}
-		input = strings.TrimSpace(input)
+			input = strings.TrimSpace(input)
 
-		// Don't accept anything other than numbers and blank input.
-		if input == "" {
-			break
-		}
+			// Don't accept anything other than numbers and blank input.
+			if input == "" {
+				break
+			}
 
-		if _, err := strconv.Atoi(input); err == nil {
-			caseNumber, _ = strconv.Atoi(input)
-			break
-			fmt.Print(caseNumber) // Oh Go, it's okay, I promise, we'll use this shit.
-		} else {
-			fmt.Print(redText("Invalid entry. "))
-			continue
+			if _, err := strconv.Atoi(input); err == nil {
+				caseNumber, _ = strconv.Atoi(input)
+				break
+				fmt.Print(caseNumber) // Oh Go, it's okay, I promise, we'll use this shit.
+			} else {
+				fmt.Print(redText("Invalid entry. "))
+				continue
+			}
 		}
 	}
 
@@ -508,7 +523,7 @@ func main() {
 			}
 
 			for {
-				fmt.Print("Where will remote job storage location be on the cluster? Entering nothing will select /home/$User/.matlab/generic_cluster_jobs/" + clusterName + "/$Host\n")
+				fmt.Print("Where will remote job storage location be on the cluster? Entering nothing will select /home/$USER/.matlab/generic_cluster_jobs/" + clusterName + "/$Host\n")
 				remoteJobStorageLocation, err = rl.Readline()
 				if err != nil {
 					if err.Error() == "Interrupt" {
@@ -532,11 +547,13 @@ func main() {
 			}
 		}
 		fmt.Print("Creating integration scripts for cluster #", i, "...\n")
+		// This is where Big Things Part 1(tm) will happen.
 
-		fmt.Print("Finished!\n")
-		fmt.Print("Submitting to GitLab...\n")
-		fmt.Print("Finished!\n")
+		fmt.Print("Finished script creation for cluster #", i, "!\n")
 	}
+	fmt.Print("Submitting to GitLab...\n")
+	// This is where Big Things Part 2(tm) will happen (sort of.)
+	fmt.Print("Finished!\n")
 }
 
 // Function to download a file from a given URL and save it to the specified path.
