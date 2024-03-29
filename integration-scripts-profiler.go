@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -81,6 +82,13 @@ func main() {
 		fmt.Print(redBackground("\nExiting from user input..."))
 		os.Exit(0)
 	}()
+
+	// Regexp compile used for detecting things with numbers and letters.
+	lettersAndNumbersPattern, err := regexp.Compile(`^[^a-zA-Z0-9]+$`)
+	if err != nil {
+		fmt.Println(redText("Error compiling regex pattern:", err, " Exiting."))
+		os.Exit(0)
+	}
 
 	// Determine your OS.
 	switch userOS := runtime.GOOS; userOS {
@@ -257,11 +265,11 @@ func main() {
 			if err != nil {
 				fmt.Println(redText("Error reading directory:", err))
 			} else {
-				fmt.Print("\nExisting engagements found:")
+				fmt.Print("\n\nExisting engagements found:\n\n")
 				for _, f := range files {
 					if f.IsDir() {
 						engagementFolders = append(engagementFolders, f.Name())
-						fmt.Println("\n -", f.Name())
+						fmt.Println("-", f.Name())
 					}
 				}
 			}
@@ -309,12 +317,9 @@ func main() {
 			// Don't accept anything other than numbers and blank input.
 			if input == "" {
 				break
-			}
-
-			if _, err := strconv.Atoi(input); err == nil {
+			} else if _, err := strconv.Atoi(input); err == nil && input != "" {
 				caseNumber, _ = strconv.Atoi(input)
 				break
-				fmt.Print(caseNumber) // Oh Go, it's okay, I promise, we'll use this shit.
 			} else {
 				fmt.Print(redText("Invalid entry. "))
 				continue
@@ -353,7 +358,7 @@ func main() {
 	// Loop cluster creation for as many times as you specified.
 	for i := 1; i <= clusterCount; i++ {
 		for {
-			fmt.Print("Enter cluster #", i, "'s name.\n")
+			fmt.Print("Enter cluster #", i, "'s name. Entering nothing will use \"HPC\"\n")
 			clusterName, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
@@ -366,8 +371,10 @@ func main() {
 			clusterName = strings.TrimSpace(clusterName)
 
 			if clusterName == "" {
-				fmt.Print(redText("Invalid entry. "))
-				continue
+				clusterName = "HPC"
+				break
+			} else if lettersAndNumbersPattern.MatchString(clusterName) && clusterName != "" {
+				fmt.Print(redText("Invalid input. You must include at least 1 letter or number in the cluster's name.\n"))
 			} else {
 				break
 			}
@@ -386,8 +393,22 @@ func main() {
 				}
 				return
 			}
-			schedulerSelected = strings.TrimSpace(schedulerSelected)
-			break
+
+			// Parse for an integer to make some prettier code.
+			var schedulerNumberSelected int
+			parsedInt, err := strconv.Atoi(schedulerSelected)
+			if err != nil {
+				fmt.Println(redText("You did not enter a number. Enter a valid number.\n", err))
+			} else {
+				schedulerNumberSelected = parsedInt
+			}
+
+			if schedulerNumberSelected < 1 || schedulerNumberSelected > 7 {
+				fmt.Print(redText("You selected an invalid number. You must select a number between 1-7.\n"))
+				continue
+			} else {
+				break
+			}
 		}
 
 		for {
@@ -548,7 +569,7 @@ func main() {
 		}
 		fmt.Print("Creating integration scripts for cluster #", i, "...\n")
 		// This is where Big Things Part 1(tm) will happen.
-
+		fmt.Print("Case number: ", caseNumber)
 		fmt.Print("Finished script creation for cluster #", i, "!\n")
 	}
 	fmt.Print("Submitting to GitLab...\n")
