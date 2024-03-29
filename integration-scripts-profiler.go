@@ -288,6 +288,7 @@ func main() {
 				fmt.Println(redText("Exiting from user input."))
 			} else {
 				fmt.Print(redText("Error reading line:", err))
+				continue
 			}
 			return
 		}
@@ -309,6 +310,7 @@ func main() {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
 					fmt.Print(redText("Error reading line:", err))
+					continue
 				}
 				return
 			}
@@ -335,6 +337,7 @@ func main() {
 				fmt.Println(redText("Exiting from user input."))
 			} else {
 				fmt.Print(redText("Error reading line:", err))
+				continue
 			}
 			return
 		}
@@ -365,6 +368,7 @@ func main() {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
 					fmt.Print(redText("Error reading line:", err))
+					continue
 				}
 				return
 			}
@@ -380,6 +384,17 @@ func main() {
 			}
 		}
 
+		// Map numbers to actual scheduler names.
+		schedulerMap := map[int]string{
+			1: "Slurm",
+			2: "PBS",
+			3: "LSF",
+			4: "Grid Engine",
+			5: "HTCondor",
+			6: "AWS",
+			7: "Kubernetes",
+		}
+
 		// waaaahhhh it's too difficult to just say "while".
 		for {
 			fmt.Print("Select the scheduler you'd like to use by entering its corresponding number. Entering nothing will select Slurm.\n")
@@ -390,8 +405,14 @@ func main() {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
 					fmt.Print(redText("Error reading line:", err))
+					continue
 				}
 				return
+			}
+
+			if schedulerSelected == "" {
+				schedulerSelected = "Slurm"
+				break
 			}
 
 			// Parse for an integer to make some prettier code.
@@ -405,6 +426,7 @@ func main() {
 
 			if schedulerNumberSelected < 1 || schedulerNumberSelected > 7 {
 				fmt.Print(redText("You selected an invalid number. You must select a number between 1-7.\n"))
+				schedulerSelected = schedulerMap[schedulerNumberSelected]
 				continue
 			} else {
 				break
@@ -420,6 +442,7 @@ func main() {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
 					fmt.Print(redText("Error reading line:", err))
+					continue
 				}
 				return
 			}
@@ -454,6 +477,7 @@ func main() {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
 					fmt.Print(redText("Error reading line:", err))
+					continue
 				}
 				return
 			}
@@ -483,6 +507,7 @@ func main() {
 						fmt.Println(redText("Exiting from user input."))
 					} else {
 						fmt.Print(redText("Error reading line:", err))
+						continue
 					}
 					return
 				}
@@ -509,6 +534,7 @@ func main() {
 						fmt.Println(redText("Exiting from user input."))
 					} else {
 						fmt.Print(redText("Error reading line:", err))
+						continue
 					}
 					return
 				}
@@ -530,6 +556,7 @@ func main() {
 						fmt.Println(redText("Exiting from user input."))
 					} else {
 						fmt.Print(redText("Error reading line:", err))
+						continue
 					}
 					return
 				}
@@ -551,6 +578,7 @@ func main() {
 						fmt.Println(redText("Exiting from user input."))
 					} else {
 						fmt.Print(redText("Error reading line:", err))
+						continue
 					}
 					return
 				}
