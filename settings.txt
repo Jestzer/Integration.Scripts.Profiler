@@ -2,6 +2,6 @@
 downloadScriptsOnLaunch = true
 #scriptsPath = "C:\Users\toaja\Downloads\"
 accessToken = abc123
-gitlabPath = C:\Gitlab
+gitRepoPath = C:\Gitlab
 gitRepoURL = https://github.com/Jestzer/
 useCaseNumber = true

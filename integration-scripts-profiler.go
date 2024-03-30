@@ -56,9 +56,13 @@ func main() {
 	var downloadScriptsOnLanuch bool = true
 	var useCaseNumber bool = true
 	var caseNumber int
-	var gitlabPath string
+	var gitRepoPath string
 	var schedulerSelected string
 	var organizationSelected string
+	var organizationAbbreviation string
+	var organizationContact string
+	var customMPIInput string
+	var customMPI bool
 	var clusterCount int
 	var clusterName string
 	var submissionType string
@@ -85,6 +89,12 @@ func main() {
 
 	// Regexp compile used for detecting things with numbers and letters.
 	lettersAndNumbersPattern, err := regexp.Compile(`^[^a-zA-Z0-9]+$`)
+	if err != nil {
+		fmt.Println(redText("Error compiling regex pattern:", err, " Exiting."))
+		os.Exit(0)
+	}
+
+	lettersPattern, err := regexp.Compile(`^[^a-zA-Z]+$`)
 	if err != nil {
 		fmt.Println(redText("Error compiling regex pattern:", err, " Exiting."))
 		os.Exit(0)
@@ -171,25 +181,25 @@ func main() {
 						accessToken = strings.TrimSpace(accessToken)
 						accessToken = strings.Trim(accessToken, "\"")
 						fmt.Print("\nYour access token has been set to ", accessToken)
-					} else if strings.HasPrefix(line, "gitlabPath =") || strings.HasPrefix(line, "gitlabPath=") {
-						gitlabPath = strings.TrimPrefix(line, "gitlabPath =")
-						gitlabPath = strings.TrimPrefix(gitlabPath, "gitlabPath=")
-						gitlabPath = strings.TrimSpace(gitlabPath)
-						gitlabPath = strings.Trim(gitlabPath, "\"")
+					} else if strings.HasPrefix(line, "gitRabPath =") || strings.HasPrefix(line, "gitRepoPath=") {
+						gitRepoPath = strings.TrimPrefix(line, "gitRepoPath =")
+						gitRepoPath = strings.TrimPrefix(gitRepoPath, "gitRepoPath=")
+						gitRepoPath = strings.TrimSpace(gitRepoPath)
+						gitRepoPath = strings.Trim(gitRepoPath, "\"")
 
 						// Check if the path exists.
-						if _, err := os.Stat(gitlabPath); os.IsNotExist(err) {
-							fmt.Print("\nThe specified GitLab path does not exist:", gitlabPath, ". It will not be used.")
-							gitlabPath = ""
+						if _, err := os.Stat(gitRepoPath); os.IsNotExist(err) {
+							fmt.Print("\nThe specified Git repo path does not exist:", gitRepoPath, ". It will not be used.")
+							gitRepoPath = ""
 						} else {
-							fmt.Print("\nYour GitLab path has been set to ", gitlabPath)
+							fmt.Print("\nYour GitRepo path has been set to ", gitRepoPath)
 						}
 					} else if strings.HasPrefix(line, "gitRepoURL =") || strings.HasPrefix(line, "gitRepoURL=") {
 						gitRepoURL = strings.TrimPrefix(line, "gitRepoURL =")
 						gitRepoURL = strings.TrimPrefix(gitRepoURL, "gitRepoURL=")
 						gitRepoURL = strings.TrimSpace(gitRepoURL)
 						gitRepoURL = strings.Trim(gitRepoURL, "\"")
-						fmt.Print("\nYour Git Repo URL has been set to ", gitRepoURL)
+						fmt.Print("\nYour Git repo URL has been set to ", gitRepoURL)
 					} else if strings.HasPrefix(strings.ToLower(line), "usecasenumber") {
 						if strings.Contains(strings.ToLower(line), "false") {
 							useCaseNumber = false
@@ -258,8 +268,8 @@ func main() {
 
 	// List existing engagements and setup auto-completion.
 	var engagementFolders []string
-	if gitlabPath != "" {
-		customerEngagementsPath := filepath.Join(gitlabPath, "Customer-Engagements")
+	if gitRepoPath != "" {
+		customerEngagementsPath := filepath.Join(gitRepoPath, "Customer-Engagements")
 		if _, err := os.Stat(customerEngagementsPath); !os.IsNotExist(err) {
 			files, err := os.ReadDir(customerEngagementsPath)
 			if err != nil {
@@ -276,7 +286,7 @@ func main() {
 		}
 	}
 
-	// Define auto-completer.
+	// Setup auto-completer.
 	completer := &FolderCompleter{Folders: engagementFolders}
 	rl.Config.AutoComplete = completer
 
@@ -301,6 +311,55 @@ func main() {
 			break
 		}
 	}
+	// # Add some code that'll check to see if the abbreviation has already been set in the remote git repo.
+	for {
+		fmt.Print("\nEnter the organization's abrreviation. If it's unknown, leave it empty.\n")
+		organizationAbbreviation, err = rl.Readline()
+		if err != nil {
+			if err.Error() == "Interrupt" {
+				fmt.Println(redText("Exiting from user input."))
+			} else {
+				fmt.Print(redText("Error reading line:", err))
+				continue
+			}
+			return
+		}
+		organizationAbbreviation = strings.TrimSpace(organizationAbbreviation)
+
+		if organizationAbbreviation == "" {
+			break
+		} else if lettersPattern.MatchString(organizationAbbreviation) && organizationAbbreviation != "" {
+			fmt.Print(redText("\nInvalid input. You may only use letters in the abbreviation and at least 1 letter is required.\n"))
+			continue
+		} else {
+			break
+		}
+	}
+	// # Add some code that'll search for any existing contacts.
+	for {
+		fmt.Print("\nEnter the organization's contact name. If it's unknown, leave it empty and it will populate as \"first-last\".\n")
+		organizationContact, err = rl.Readline()
+		if err != nil {
+			if err.Error() == "Interrupt" {
+				fmt.Println(redText("Exiting from user input."))
+			} else {
+				fmt.Print(redText("Error reading line:", err))
+				continue
+			}
+			return
+		}
+		organizationContact = strings.TrimSpace(organizationContact)
+
+		if organizationContact == "" {
+			organizationContact = "first-last"
+			break
+		} else if lettersPattern.MatchString(organizationContact) && organizationContact != "" {
+			fmt.Print(redText("\nInvalid input. You may only use letters in the contact name and at least 1 letter is required.\n"))
+			continue
+		} else {
+			break
+		}
+	}
 	if useCaseNumber {
 		for {
 			fmt.Print("Enter the Salesforce Case Number associated with these scripts. Press Enter to skip.\n")
@@ -318,6 +377,7 @@ func main() {
 
 			// Don't accept anything other than numbers and blank input.
 			if input == "" {
+				useCaseNumber = false
 				break
 			} else if _, err := strconv.Atoi(input); err == nil && input != "" {
 				caseNumber, _ = strconv.Atoi(input)
@@ -390,6 +450,7 @@ func main() {
 				break
 			} else if lettersAndNumbersPattern.MatchString(clusterName) && clusterName != "" {
 				fmt.Print(redText("Invalid input. You must include at least 1 letter or number in the cluster's name.\n"))
+				continue
 			} else {
 				break
 			}
@@ -426,7 +487,7 @@ func main() {
 				break
 			}
 
-			// Parse for an integer to make some prettier code.
+			// Parse for an integer to make for some prettier code later.
 			var schedulerNumberSelected int
 			parsedInt, err := strconv.Atoi(schedulerSelected)
 			if err != nil {
@@ -442,6 +503,36 @@ func main() {
 				continue
 			} else {
 				break
+			}
+		}
+
+		for {
+			fmt.Print("Would you like to use include the custom MPI file? (y/n) Entering nothing will not include it.\n")
+			customMPIInput, err = rl.Readline()
+			if err != nil {
+				if err.Error() == "Interrupt" {
+					fmt.Println(redText("Exiting from user input."))
+				} else {
+					fmt.Print(redText("Error reading line:", err))
+					continue
+				}
+				return
+			}
+
+			strings.TrimSpace(strings.ToLower(customMPIInput))
+
+			if customMPIInput == "" {
+				customMPI = false
+				break
+			} else if customMPIInput == "y" || customMPIInput == "yes" {
+				customMPI = true
+				break
+			} else if customMPIInput == "n" || customMPIInput == "no" {
+				customMPI = false
+				break
+			} else {
+				fmt.Print(redText("\nInvalid input. You must enter one of the following: \"y\" or \"n\".\n"))
+				continue
 			}
 		}
 
@@ -480,6 +571,8 @@ func main() {
 				continue
 			}
 		}
+
+		// # Add some code that'll ask the user if they want to include the remote submission scripts.
 
 		for {
 			fmt.Print("Enter the number of workers available on the cluster's license. Entering nothing will select 100,000.\n")
@@ -613,10 +706,15 @@ func main() {
 		}
 		fmt.Print("Creating integration scripts for cluster #", i, "...\n")
 		// This is where Big Things Part 1(tm) will happen.
-		fmt.Print("Case number: ", caseNumber, "\n")
+		if useCaseNumber {
+			fmt.Print("Case number: ", caseNumber, "\n")
+		}
+		if customMPI {
+			fmt.Print("you did it. custom mpi. yipee.")
+		}
 		fmt.Print("Finished script creation for cluster #", i, "!\n")
 	}
-	fmt.Print("Submitting to GitLab...\n")
+	fmt.Print("Submitting to your remote Git repo...\n")
 	// This is where Big Things Part 2(tm) will happen (sort of.)
 	fmt.Print("Finished!\n")
 }
