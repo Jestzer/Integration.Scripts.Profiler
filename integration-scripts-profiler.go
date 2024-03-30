@@ -351,9 +351,13 @@ func main() {
 
 		if _, err := strconv.Atoi(input); err == nil {
 			clusterCount, _ = strconv.Atoi(input)
+			if clusterCount < 1 {
+				fmt.Print(redText("Invalid entry. You've selected zero or less clusters to create scripts for.\n"))
+				continue
+			}
 			break
 		} else {
-			fmt.Print(redText("Invalid entry. "))
+			fmt.Print(redText("Invalid entry. Please enter an integer greater than zero.\n"))
 			continue
 		}
 	}
@@ -419,13 +423,14 @@ func main() {
 			var schedulerNumberSelected int
 			parsedInt, err := strconv.Atoi(schedulerSelected)
 			if err != nil {
-				fmt.Println(redText("You did not enter a number. Enter a valid number.\n", err))
+				fmt.Println(redText("\nYou did not enter a number. Enter a number to select a scheduler."))
+				continue
 			} else {
 				schedulerNumberSelected = parsedInt
 			}
 
 			if schedulerNumberSelected < 1 || schedulerNumberSelected > 7 {
-				fmt.Print(redText("You selected an invalid number. You must select a number between 1-7.\n"))
+				fmt.Print(redText("\nYou selected an invalid number. You must select a number between 1-7.\n"))
 				schedulerSelected = schedulerMap[schedulerNumberSelected]
 				continue
 			} else {
@@ -435,7 +440,7 @@ func main() {
 
 		for {
 			fmt.Print("Select the submissions types you'd like to include by entering its corresponding number. Entering nothing will select both.\n")
-			fmt.Print("[1 Remote] [2 Cluster] [3 Both]\n")
+			fmt.Print("[1 Desktop] [2 Cluster] [3 Both]\n")
 			submissionType, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
@@ -464,7 +469,7 @@ func main() {
 			} else if submissionType == "cluster" || submissionType == "remote" || submissionType == "both" {
 				break
 			} else {
-				fmt.Print(redText("Invalid entry. "))
+				fmt.Print(redText("Invalid entry. Enter a number between 1-3 to select a submission type.\n"))
 				continue
 			}
 		}
@@ -492,6 +497,10 @@ func main() {
 			// Don't accept anything other than numbers.
 			if _, err := strconv.Atoi(input); err == nil {
 				numberOfWorkers, _ = strconv.Atoi(input)
+				if numberOfWorkers < 1 {
+					fmt.Print(redText("Invalid entry. You've selected zero or less workers.\n"))
+					continue
+				}
 				break
 			} else {
 				fmt.Print(redText("Invalid entry. "))
@@ -597,7 +606,7 @@ func main() {
 		}
 		fmt.Print("Creating integration scripts for cluster #", i, "...\n")
 		// This is where Big Things Part 1(tm) will happen.
-		fmt.Print("Case number: ", caseNumber)
+		fmt.Print("Case number: ", caseNumber, "\n")
 		fmt.Print("Finished script creation for cluster #", i, "!\n")
 	}
 	fmt.Print("Submitting to GitLab...\n")
