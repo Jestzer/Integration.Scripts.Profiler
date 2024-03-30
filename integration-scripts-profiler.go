@@ -179,7 +179,7 @@ func main() {
 
 						// Check if the path exists.
 						if _, err := os.Stat(gitlabPath); os.IsNotExist(err) {
-							fmt.Println("\nThe specified GitLab path does not exist:", gitlabPath, ". It will not be used.")
+							fmt.Print("\nThe specified GitLab path does not exist:", gitlabPath, ". It will not be used.")
 							gitlabPath = ""
 						} else {
 							fmt.Print("\nYour GitLab path has been set to ", gitlabPath)
@@ -263,7 +263,7 @@ func main() {
 		if _, err := os.Stat(customerEngagementsPath); !os.IsNotExist(err) {
 			files, err := os.ReadDir(customerEngagementsPath)
 			if err != nil {
-				fmt.Println(redText("Error reading directory:", err))
+				fmt.Print(redText("\nError reading directory:", err))
 			} else {
 				fmt.Print("\n\nExisting engagements found:\n\n")
 				for _, f := range files {
@@ -321,6 +321,13 @@ func main() {
 				break
 			} else if _, err := strconv.Atoi(input); err == nil && input != "" {
 				caseNumber, _ = strconv.Atoi(input)
+				if caseNumber < 01000000 {
+					fmt.Print(redText("Are you sure that's the right Case Number? It seems a bit too small.\n"))
+					continue
+				} else if caseNumber > 20000000 {
+					fmt.Print(redText("Are you sure that's the right Case Number? It seems a bit too large.\n"))
+					continue
+				}
 				break
 			} else {
 				fmt.Print(redText("Invalid entry. "))
@@ -423,7 +430,7 @@ func main() {
 			var schedulerNumberSelected int
 			parsedInt, err := strconv.Atoi(schedulerSelected)
 			if err != nil {
-				fmt.Println(redText("\nYou did not enter a number. Enter a number to select a scheduler."))
+				fmt.Print(redText("\nYou did not enter a number. Enter a number to select a scheduler.\n"))
 				continue
 			} else {
 				schedulerNumberSelected = parsedInt
