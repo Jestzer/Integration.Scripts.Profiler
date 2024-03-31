@@ -57,6 +57,7 @@ func main() {
 	var useCaseNumber bool = true
 	var caseNumber int
 	var gitRepoPath string
+	var gitUsername string
 	var schedulerSelected string
 	var organizationSelected string
 	var organizationAbbreviation string
@@ -200,6 +201,12 @@ func main() {
 						gitRepoURL = strings.TrimSpace(gitRepoURL)
 						gitRepoURL = strings.Trim(gitRepoURL, "\"")
 						fmt.Print("\nYour Git repo URL has been set to ", gitRepoURL)
+					} else if strings.HasPrefix(line, "gitUsername =") || strings.HasPrefix(line, "gitUsername=") {
+						gitUsername = strings.TrimPrefix(line, "gitUsername =")
+						gitUsername = strings.TrimPrefix(gitUsername, "gitUsername=")
+						gitUsername = strings.TrimSpace(gitUsername)
+						gitUsername = strings.Trim(gitUsername, "\"")
+						fmt.Print("\nYour Git repo username has been set to ", gitUsername)
 					} else if strings.HasPrefix(strings.ToLower(line), "usecasenumber") {
 						if strings.Contains(strings.ToLower(line), "false") {
 							useCaseNumber = false
