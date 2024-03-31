@@ -181,7 +181,7 @@ func main() {
 						accessToken = strings.TrimSpace(accessToken)
 						accessToken = strings.Trim(accessToken, "\"")
 						fmt.Print("\nYour access token has been set to ", accessToken)
-					} else if strings.HasPrefix(line, "gitRabPath =") || strings.HasPrefix(line, "gitRepoPath=") {
+					} else if strings.HasPrefix(line, "gitRepoPath =") || strings.HasPrefix(line, "gitRepoPath=") {
 						gitRepoPath = strings.TrimPrefix(line, "gitRepoPath =")
 						gitRepoPath = strings.TrimPrefix(gitRepoPath, "gitRepoPath=")
 						gitRepoPath = strings.TrimSpace(gitRepoPath)
@@ -335,29 +335,56 @@ func main() {
 			break
 		}
 	}
-	// # Add some code that'll search for any existing contacts.
-	for {
-		fmt.Print("\nEnter the organization's contact name. If it's unknown, leave it empty and it will populate as \"first-last\".\n")
-		organizationContact, err = rl.Readline()
-		if err != nil {
-			if err.Error() == "Interrupt" {
-				fmt.Println(redText("Exiting from user input."))
+	// # Need to finish code below.
+	// List existing contacts and setup auto-completion.
+	var contactFolders []string
+	if gitRepoPath != "" {
+		contactsPath := filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
+		if _, err := os.Stat(contactsPath); !os.IsNotExist(err) {
+			files, err := os.ReadDir(contactsPath)
+			if err != nil {
+				fmt.Print(redText("\nError reading directory:", err))
 			} else {
-				fmt.Print(redText("Error reading line:", err))
-				continue
+				fmt.Print("\n\nExisting engagements found:\n\n")
+				for _, f := range files {
+					if f.IsDir() {
+						contactFolders = append(contactFolders, f.Name())
+						fmt.Println("-", f.Name())
+					}
+				}
 			}
-			return
 		}
-		organizationContact = strings.TrimSpace(organizationContact)
+	}
 
-		if organizationContact == "" {
-			organizationContact = "first-last"
-			break
-		} else if lettersPattern.MatchString(organizationContact) && organizationContact != "" {
-			fmt.Print(redText("\nInvalid input. You may only use letters in the contact name and at least 1 letter is required.\n"))
-			continue
-		} else {
-			break
+	// Setup auto-completer.
+	completer := &FolderCompleter{Folders: contactFolders}
+	rl.Config.AutoComplete = completer
+
+	// # Add some code that'll search for any existing contacts.
+	if gitRepoPath != "" {
+		for {
+			fmt.Print("\nEnter the organization's contact name. If it's unknown, leave it empty and it will populate as \"first-last\".\n")
+			organizationContact, err = rl.Readline()
+			if err != nil {
+				if err.Error() == "Interrupt" {
+					fmt.Println(redText("Exiting from user input."))
+				} else {
+					fmt.Print(redText("Error reading line:", err))
+					continue
+				}
+				return
+			}
+			organizationContact = strings.TrimSpace(organizationContact)
+
+			if organizationContact == "" {
+				organizationContact = "first-last"
+				break
+			} else if lettersPattern.MatchString(organizationContact) && organizationContact != "" {
+				fmt.Print(redText("\nInvalid input. You may only use letters in the contact name and at least 1 letter is required.\n"))
+				continue
+			} else {
+				break
+			}
 		}
 	}
 	if useCaseNumber {
