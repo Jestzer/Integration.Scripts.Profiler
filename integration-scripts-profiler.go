@@ -284,6 +284,12 @@ func main() {
 			} else {
 				fmt.Print("\n\nExisting engagements found:\n\n")
 				for _, f := range files {
+
+					// Don't list "hidden" folders.
+					if strings.HasPrefix(f.Name(), ".") {
+						continue
+					}
+
 					if f.IsDir() {
 						engagementFolders = append(engagementFolders, f.Name())
 						fmt.Println("-", f.Name())
@@ -318,6 +324,10 @@ func main() {
 			break
 		}
 	}
+
+	// Now that we know what the organization's name is, define its path.
+	var organizationPath = filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
+
 	// # Add some code that'll check to see if the abbreviation has already been set in the remote git repo.
 	for {
 		fmt.Print("\nEnter the organization's abrreviation. If it's unknown, leave it empty.\n")
@@ -348,14 +358,19 @@ func main() {
 		// List existing contacts and setup auto-completion.
 		var contactFolders []string
 		if gitRepoPath != "" {
-			contactsPath := filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
-			if _, err := os.Stat(contactsPath); !os.IsNotExist(err) {
-				files, err := os.ReadDir(contactsPath)
+			if _, err := os.Stat(organizationPath); !os.IsNotExist(err) {
+				files, err := os.ReadDir(organizationPath)
 				if err != nil {
 					fmt.Print(redText("\nError reading directory:", err))
 				} else {
 					fmt.Print("\n\nExisting contacts found:\n\n")
 					for _, f := range files {
+
+						// We don't want your .git folders listed, thanks.
+						if strings.HasPrefix(f.Name(), ".") {
+							continue
+						}
+
 						if f.IsDir() {
 							contactFolders = append(contactFolders, f.Name())
 							fmt.Println("-", f.Name())
