@@ -335,33 +335,33 @@ func main() {
 			break
 		}
 	}
-	// # Need to finish code below.
-	// List existing contacts and setup auto-completion.
-	var contactFolders []string
+
 	if gitRepoPath != "" {
-		contactsPath := filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
-		if _, err := os.Stat(contactsPath); !os.IsNotExist(err) {
-			files, err := os.ReadDir(contactsPath)
-			if err != nil {
-				fmt.Print(redText("\nError reading directory:", err))
-			} else {
-				fmt.Print("\n\nExisting engagements found:\n\n")
-				for _, f := range files {
-					if f.IsDir() {
-						contactFolders = append(contactFolders, f.Name())
-						fmt.Println("-", f.Name())
+
+		// List existing contacts and setup auto-completion.
+		var contactFolders []string
+		if gitRepoPath != "" {
+			contactsPath := filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
+			if _, err := os.Stat(contactsPath); !os.IsNotExist(err) {
+				files, err := os.ReadDir(contactsPath)
+				if err != nil {
+					fmt.Print(redText("\nError reading directory:", err))
+				} else {
+					fmt.Print("\n\nExisting contacts found:\n\n")
+					for _, f := range files {
+						if f.IsDir() {
+							contactFolders = append(contactFolders, f.Name())
+							fmt.Println("-", f.Name())
+						}
 					}
 				}
 			}
 		}
-	}
 
-	// Setup auto-completer.
-	completer := &FolderCompleter{Folders: contactFolders}
-	rl.Config.AutoComplete = completer
+		// Setup auto-completer.
+		completer := &FolderCompleter{Folders: contactFolders}
+		rl.Config.AutoComplete = completer
 
-	// # Add some code that'll search for any existing contacts.
-	if gitRepoPath != "" {
 		for {
 			fmt.Print("\nEnter the organization's contact name. If it's unknown, leave it empty and it will populate as \"first-last\".\n")
 			organizationContact, err = rl.Readline()
@@ -374,6 +374,7 @@ func main() {
 				}
 				return
 			}
+
 			organizationContact = strings.TrimSpace(organizationContact)
 
 			if organizationContact == "" {
@@ -584,14 +585,14 @@ func main() {
 			} else if submissionType == "1" || submissionType == "2" || submissionType == "3" {
 				switch submissionType {
 				case "1":
-					submissionType = "remote"
+					submissionType = "desktop"
 				case "2":
 					submissionType = "cluster"
 				case "3":
 					submissionType = "both"
 				}
 				break
-			} else if submissionType == "cluster" || submissionType == "remote" || submissionType == "both" {
+			} else if submissionType == "cluster" || submissionType == "desktop" || submissionType == "both" {
 				break
 			} else {
 				fmt.Print(redText("Invalid entry. Enter a number between 1-3 to select a submission type.\n"))
@@ -627,14 +628,17 @@ func main() {
 				if numberOfWorkers < 1 {
 					fmt.Print(redText("Invalid entry. You've selected zero or less workers.\n"))
 					continue
+				} else if numberOfWorkers > 100000 {
+					fmt.Print(redText("Invalid entry. You've selected more than 100000 workers, which is not offered on any license.\n"))
+					continue
 				}
 				break
 			} else {
-				fmt.Print(redText("Invalid entry. "))
+				fmt.Print(redText("Invalid entry. You've likely included a character other than a number.\n"))
 				continue
 			}
 		}
-		if submissionType == "remote" || submissionType == "both" {
+		if submissionType == "desktop" || submissionType == "both" {
 			for {
 				fmt.Print("Does the client have a shared filesystem with the cluster? (y/n)\n")
 				input, err = rl.Readline()
@@ -657,7 +661,7 @@ func main() {
 					hasSharedFileSystem = false
 					break
 				} else {
-					fmt.Print(redText("Invalid entry. "))
+					fmt.Print(redText("Invalid entry.\n"))
 					continue
 				}
 			}
