@@ -14,15 +14,22 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/xanzy/go-gitlab"
 )
 
 type FolderCompleter struct {
 	Folders []string
 }
 
+// This function needs to be placed before the main function IIRC.
 func (f *FolderCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
 	prefix := string(line[:pos]) // Ensure we're only considering the part of the line up to the cursor.
 	for _, folder := range f.Folders {
@@ -35,6 +42,15 @@ func (f *FolderCompleter) Do(line []rune, pos int) (newLine [][]rune, length int
 	length = len(prefix)
 	return
 }
+
+// Cross-function variables.
+var (
+	accessToken          string
+	organizationSelected string
+	gitUsername          string
+	gitEmailAddress      string
+	organizationPath     string
+)
 
 func main() {
 	// To handle keyboard input better.
@@ -51,7 +67,6 @@ func main() {
 	// Goodies.
 	var input string
 	var scriptsPath string
-	var accessToken string
 	var gitRepoURL string
 	var downloadScriptsOnLanuch bool = true
 	var useCaseNumber bool = true
@@ -59,7 +74,6 @@ func main() {
 	var gitRepoPath string
 	var gitUsername string
 	var schedulerSelected string
-	var organizationSelected string
 	var organizationAbbreviation string
 	var organizationContact string
 	var customMPIInput string
@@ -207,6 +221,12 @@ func main() {
 						gitUsername = strings.TrimSpace(gitUsername)
 						gitUsername = strings.Trim(gitUsername, "\"")
 						fmt.Print("\nYour Git repo username has been set to ", gitUsername)
+					} else if strings.HasPrefix(line, "gitEmailAddress =") || strings.HasPrefix(line, "gitEmailAddress=") {
+						gitEmailAddress = strings.TrimPrefix(line, "gitEmailAddress =")
+						gitEmailAddress = strings.TrimPrefix(gitEmailAddress, "gitEmailAddress=")
+						gitEmailAddress = strings.TrimSpace(gitEmailAddress)
+						gitEmailAddress = strings.Trim(gitEmailAddress, "\"")
+						fmt.Print("\nYour Git repo email address has been set to ", gitEmailAddress)
 					} else if strings.HasPrefix(strings.ToLower(line), "usecasenumber") {
 						if strings.Contains(strings.ToLower(line), "false") {
 							useCaseNumber = false
@@ -326,7 +346,7 @@ func main() {
 	}
 
 	// Now that we know what the organization's name is, define its path.
-	var organizationPath = filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
+	organizationPath = filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
 
 	// # Add some code that'll check to see if the abbreviation has already been set in the remote git repo.
 	for {
@@ -769,6 +789,29 @@ func main() {
 	}
 	fmt.Print("Submitting to your remote Git repo...\n")
 	// This is where Big Things Part 2(tm) will happen (sort of.)
+
+	// Create the local repo.
+	if err := createLocalGitRepo(organizationPath); err != nil {
+		fmt.Println("Error creating local Git repo:", err)
+		return
+	}
+
+	// Create the repo on GitLab.
+	projectURL, err := createGitLabRepo(organizationSelected, accessToken)
+	if err != nil {
+		fmt.Println("Error creating GitLab project:", err)
+		return
+	}
+
+	fmt.Println("GitLab project created:", projectURL)
+
+	// Commit the changes made and push them to the remote repo.
+	if err := commitAndPush(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
+		fmt.Println("Error committing or pushing:", err)
+		return
+	}
+
+	fmt.Println("Pushed to GitLab successfully.")
 	fmt.Print("Finished!\n")
 }
 
@@ -839,4 +882,71 @@ func unzipFile(src, dest string) error {
 		}
 	}
 	return nil
+}
+
+func createLocalGitRepo(folderPath string) error {
+	_, err := git.PlainInit(folderPath, false)
+	return err
+}
+
+func createGitLabRepo(projectName, accessToken string) (string, error) {
+	git, err := gitlab.NewClient(accessToken)
+	if err != nil {
+		return "", err
+	}
+
+	project, _, err := git.Projects.CreateProject(&gitlab.CreateProjectOptions{
+		Name: &projectName,
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return project.WebURL, nil
+}
+
+func commitAndPush(folderPath, projectName, gitUsername, accessToken string) error {
+	r, err := git.PlainOpen(folderPath)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.CreateRemote(&config.RemoteConfig{
+		Name: "main",
+		URLs: []string{fmt.Sprintf("git@gitlab.com:%s/%s.git", gitUsername, projectName)},
+	})
+	if err != nil && !strings.Contains(err.Error(), "remote already exists") {
+		return err
+	}
+
+	w, err := r.Worktree()
+	if err != nil {
+		return err
+	}
+
+	// Stage all changes to the folder.
+	err = w.AddWithOptions(&git.AddOptions{All: true})
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Commit("Initial commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  gitUsername,
+			Email: gitEmailAddress,
+			When:  time.Now(),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return r.Push(&git.PushOptions{
+		RemoteName: "main",
+		Auth: &githttp.BasicAuth{
+			Username: gitUsername,
+			Password: accessToken,
+		},
+	})
 }

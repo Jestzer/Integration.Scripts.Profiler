@@ -2,6 +2,7 @@
 downloadScriptsOnLaunch = true
 #scriptsPath = "C:\Users\toaja\Downloads\"
 accessToken = abc123
+gitEmailAddress = james@email.com
 gitRepoPath = C:\Gitlab
 gitRepoURL = https://github.com/Jestzer/
 gitUsername = Jestzer
