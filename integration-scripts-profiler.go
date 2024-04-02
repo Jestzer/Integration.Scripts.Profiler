@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
@@ -47,6 +48,8 @@ func (f *FolderCompleter) Do(line []rune, pos int) (newLine [][]rune, length int
 var (
 	accessToken          string
 	organizationSelected string
+	gitGroupID           int
+	gitRepoURL           string
 	gitUsername          string
 	gitEmailAddress      string
 	organizationPath     string
@@ -71,8 +74,8 @@ func main() {
 	var downloadScriptsOnLanuch bool = true
 	var useCaseNumber bool = true
 	var caseNumber int
+	var gitGroupName string
 	var gitRepoPath string
-	var gitUsername string
 	var schedulerSelected string
 	var organizationAbbreviation string
 	var organizationContact string
@@ -106,13 +109,13 @@ func main() {
 	lettersAndNumbersPattern, err := regexp.Compile(`^[^a-zA-Z0-9]+$`)
 	if err != nil {
 		fmt.Println(redText("Error compiling regex pattern:", err, " Exiting."))
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	lettersPattern, err := regexp.Compile(`^[^a-zA-Z]+$`)
 	if err != nil {
 		fmt.Println(redText("Error compiling regex pattern:", err, " Exiting."))
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	// Determine your OS.
@@ -126,7 +129,7 @@ func main() {
 	default:
 		scriptsPath = "unknown"
 		fmt.Print(redText("\nYour operating system is unrecognized. Exiting."))
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	// Determine any user-defined settings.
@@ -173,7 +176,7 @@ func main() {
 						_, err := os.Stat(scriptsPath) // Do you actually exist? Does anything actually exist, man?
 						if err != nil {
 							fmt.Print(redText("\nThe custom scripts path you've specified, \"", scriptsPath, " does not exist. Please adjust your settings accordingly."))
-							os.Exit(0)
+							os.Exit(1)
 						}
 
 						if !downloadScriptsOnLanuch {
@@ -183,7 +186,7 @@ func main() {
 								schedulerPath := filepath.Join(scriptsPath, schedulerDirectoryName)
 								if _, err := os.Stat(schedulerPath); err != nil {
 									fmt.Printf(redText("\nThe path you've specified is missing the needed integration scripts folder \"%s\".\n"), schedulerDirectoryName)
-									os.Exit(0)
+									os.Exit(1)
 								}
 							}
 						}
@@ -196,6 +199,17 @@ func main() {
 						accessToken = strings.TrimSpace(accessToken)
 						accessToken = strings.Trim(accessToken, "\"")
 						fmt.Print("\nYour access token has been set to ", accessToken)
+					} else if strings.HasPrefix(line, "gitGroupID =") || strings.HasPrefix(line, "gitGroupID=") {
+						gitGroupIDString := strings.TrimPrefix(line, "gitGroupID =")
+						gitGroupIDString = strings.TrimPrefix(gitGroupIDString, "gitGroupID=")
+						gitGroupIDString = strings.TrimSpace(gitGroupIDString)
+						gitGroupIDString = strings.Trim(gitGroupIDString, "\"")
+
+						if _, err := strconv.Atoi(gitGroupIDString); err == nil {
+							gitGroupID, _ = strconv.Atoi(gitGroupIDString)
+						}
+
+						fmt.Print("\nYour Git group ID has been set to ", gitGroupID)
 					} else if strings.HasPrefix(line, "gitRepoPath =") || strings.HasPrefix(line, "gitRepoPath=") {
 						gitRepoPath = strings.TrimPrefix(line, "gitRepoPath =")
 						gitRepoPath = strings.TrimPrefix(gitRepoPath, "gitRepoPath=")
@@ -209,6 +223,12 @@ func main() {
 						} else {
 							fmt.Print("\nYour GitRepo path has been set to ", gitRepoPath)
 						}
+					} else if strings.HasPrefix(line, "gitGroupName =") || strings.HasPrefix(line, "gitGroupName=") {
+						gitGroupName = strings.TrimPrefix(line, "gitGroupName =")
+						gitGroupName = strings.TrimPrefix(gitGroupName, "gitGroupName=")
+						gitGroupName = strings.TrimSpace(gitGroupName)
+						gitGroupName = strings.Trim(gitGroupName, "\"")
+						fmt.Print("\nYour Git group name has been set to ", gitGroupName)
 					} else if strings.HasPrefix(line, "gitRepoURL =") || strings.HasPrefix(line, "gitRepoURL=") {
 						gitRepoURL = strings.TrimPrefix(line, "gitRepoURL =")
 						gitRepoURL = strings.TrimPrefix(gitRepoURL, "gitRepoURL=")
@@ -347,6 +367,20 @@ func main() {
 
 	// Now that we know what the organization's name is, define its path.
 	organizationPath = filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
+	gitURLToCheck = (gitGroupName, gitURL...)
+
+	// And we can check if the remote repo exists!
+	exists, err := CheckIfGitLabProjectExists(gitURLToCheck, accessToken)
+	if err != nil {
+		fmt.Println("Error checking project existence:", err)
+		return
+	}
+
+	if exists {
+		fmt.Println("The project exists.")
+	} else {
+		fmt.Println("The project does not exist.")
+	}
 
 	// # Add some code that'll check to see if the abbreviation has already been set in the remote git repo.
 	for {
@@ -383,7 +417,7 @@ func main() {
 				if err != nil {
 					fmt.Print(redText("\nError reading directory:", err))
 				} else {
-					fmt.Print("\n\nExisting contacts found:\n\n")
+					fmt.Print("\n\nExisting contacts found:\n\n") // # Add some code to not list anything if no contacts are found.
 					for _, f := range files {
 
 						// We don't want your .git folders listed, thanks.
@@ -449,7 +483,7 @@ func main() {
 			if input == "" {
 				useCaseNumber = false
 				break
-			} else if _, err := strconv.Atoi(input); err == nil && input != "" {
+			} else if _, err := strconv.Atoi(input); err == nil && input != "" { // # Add som code to do something with the potential error message.
 				caseNumber, _ = strconv.Atoi(input)
 				if caseNumber < 01000000 {
 					fmt.Print(redText("Are you sure that's the right Case Number? It seems a bit too small.\n"))
@@ -778,6 +812,15 @@ func main() {
 			}
 		}
 		fmt.Print("Creating integration scripts for cluster #", i, "...\n")
+
+		// Create the organization's directory, if it's not already in existence.
+		err := ensureDir(organizationPath)
+		if err != nil {
+			fmt.Printf("Error creating directory: %s\n", err)
+		} else {
+			fmt.Println("Organization directory created!")
+		}
+
 		// This is where Big Things Part 1(tm) will happen.
 		if useCaseNumber {
 			fmt.Print("Case number: ", caseNumber, "\n")
@@ -790,16 +833,38 @@ func main() {
 	fmt.Print("Submitting to your remote Git repo...\n")
 	// This is where Big Things Part 2(tm) will happen (sort of.)
 
-	// Create the local repo.
-	if err := createLocalGitRepo(organizationPath); err != nil {
-		fmt.Println("Error creating local Git repo:", err)
+	// Create testing file, for now.
+	testFilePath := filepath.Join(organizationPath, "testing")
+
+	file, err := os.Create(testFilePath)
+	if err != nil {
+		fmt.Println("Error creating file:", err)
 		return
+	}
+	defer file.Close()
+
+	fmt.Println("Blank file 'testing' created successfully at:", testFilePath)
+
+	// Create the local repo, if needed.
+	organizationDotGitFolder := filepath.Join(organizationPath, ".git")
+
+	if _, err := os.Stat(organizationDotGitFolder); os.IsNotExist(err) {
+		if err := createLocalGitRepo(organizationPath); err != nil {
+			fmt.Println("Error creating local Git repo:", err)
+			os.Exit(1)
+		}
+	} else if err != nil {
+		fmt.Print(redText("\nError checking if .git directory exists:", err))
+		return
+	} else {
+		// The .git directory exists, no action needed
+		fmt.Println(".git directory already exists.")
 	}
 
 	// Create the repo on GitLab.
-	projectURL, err := createGitLabRepo(organizationSelected, accessToken)
+	projectURL, err := createGitLabRepo(organizationSelected, accessToken, gitRepoURL, gitGroupID)
 	if err != nil {
-		fmt.Println("Error creating GitLab project:", err)
+		fmt.Print(redText("\nError creating GitLab project:", err))
 		return
 	}
 
@@ -807,7 +872,7 @@ func main() {
 
 	// Commit the changes made and push them to the remote repo.
 	if err := commitAndPush(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
-		fmt.Println("Error committing or pushing:", err)
+		fmt.Print(redText("\nError committing or pushing: ", err))
 		return
 	}
 
@@ -884,19 +949,69 @@ func unzipFile(src, dest string) error {
 	return nil
 }
 
+// If the directory doesn't already exist, make it!
+func ensureDir(path string) error {
+	err := os.MkdirAll(path, 0755)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func CheckIfGitLabProjectExists(organizationPath, accessToken string) (bool, error) {
+	// URL-encode the organizationPath to ensure it's HTTP-safe (important for paths with slashes).
+	url := fmt.Sprintf("%s%s", gitRepoURL, organizationPath)
+
+	// Create a new request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, err
+	}
+
+	// Add the private token to the request headers for authentication
+	req.Header.Add("PRIVATE-TOKEN", accessToken)
+
+	// Execute the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	// A 404 status code means the project does not exist
+	if resp.StatusCode == 404 {
+		return false, nil
+	}
+
+	// A 200 status code means the project exists
+	if resp.StatusCode == 200 {
+		return true, nil
+	}
+
+	// For other status codes, read the response body and return it as an error
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+
+	return false, fmt.Errorf("GitLab API returned status %d: %s", resp.StatusCode, string(body))
+}
+
 func createLocalGitRepo(folderPath string) error {
 	_, err := git.PlainInit(folderPath, false)
 	return err
 }
 
-func createGitLabRepo(projectName, accessToken string) (string, error) {
-	git, err := gitlab.NewClient(accessToken)
+func createGitLabRepo(projectName, accessToken, gitRepoURL string, namespaceID int) (string, error) {
+	git, err := gitlab.NewClient(accessToken, gitlab.WithBaseURL(gitRepoURL))
 	if err != nil {
 		return "", err
 	}
 
 	project, _, err := git.Projects.CreateProject(&gitlab.CreateProjectOptions{
-		Name: &projectName,
+		Name:        &projectName,
+		NamespaceID: gitlab.Ptr(namespaceID), // Specify the namespace ID here
 	})
 
 	if err != nil {
