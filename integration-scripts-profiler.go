@@ -312,7 +312,7 @@ func main() {
 			err = unzipFile(zipArchivePath, scriptsPath)
 			if err != nil {
 				fmt.Print(redText("\nFailed to extract integration scripts: ", err))
-				continue
+				os.Exit(1)
 			}
 
 			if strings.Contains(zipArchivePath, "kubernetes.zip") {
