@@ -49,9 +49,10 @@ var (
 	organizationSelected string
 	gitGroupID           int
 	gitRepoAPIURL        string
-	gitRepoURL           string
+	gitGroupName         string
 	gitUsername          string
 	gitEmailAddress      string
+	needToCreateGitRepo  bool
 	organizationPath     string
 )
 
@@ -219,19 +220,26 @@ func main() {
 							fmt.Print("\nThe specified Git repo path does not exist:", gitRepoPath, ". It will not be used.")
 							gitRepoPath = ""
 						} else {
-							fmt.Print("\nYour GitRepo path has been set to ", gitRepoPath)
+							fmt.Print("\nYour Git Repo path has been set to ", gitRepoPath)
 						}
 					} else if strings.HasPrefix(line, "gitRepoAPIURL =") || strings.HasPrefix(line, "gitRepoAPIURL=") {
 						gitRepoAPIURL = strings.TrimPrefix(line, "gitRepoAPIURL =")
 						gitRepoAPIURL = strings.TrimPrefix(gitRepoAPIURL, "gitRepoAPIURL=")
 						gitRepoAPIURL = strings.TrimSpace(gitRepoAPIURL)
 						gitRepoAPIURL = strings.Trim(gitRepoAPIURL, "\"")
-					} else if strings.HasPrefix(line, "gitRepoURL =") || strings.HasPrefix(line, "gitRepoURL=") {
-						gitRepoURL = strings.TrimPrefix(line, "gitRepoURL =")
-						gitRepoURL = strings.TrimPrefix(gitRepoURL, "gitRepoURL=")
-						gitRepoURL = strings.TrimSpace(gitRepoURL)
-						gitRepoURL = strings.Trim(gitRepoURL, "\"")
-						fmt.Print("\nYour Git repo URL has been set to ", gitRepoURL)
+
+						// We want the URL to end with a / for later Git repo usage.
+						if !strings.HasSuffix(gitRepoAPIURL, "/") {
+							gitRepoAPIURL += "/"
+						}
+
+						fmt.Print("\nYour Git API URL has been set to ", gitRepoAPIURL)
+					} else if strings.HasPrefix(line, "gitGroupName =") || strings.HasPrefix(line, "gitGroupName=") {
+						gitGroupName = strings.TrimPrefix(line, "gitGroupName =")
+						gitGroupName = strings.TrimPrefix(gitGroupName, "gitGroupName=")
+						gitGroupName = strings.TrimSpace(gitGroupName)
+						gitGroupName = strings.Trim(gitGroupName, "\"")
+						fmt.Print("\nYour Git group name has been set to ", gitGroupName)
 					} else if strings.HasPrefix(line, "gitUsername =") || strings.HasPrefix(line, "gitUsername=") {
 						gitUsername = strings.TrimPrefix(line, "gitUsername =")
 						gitUsername = strings.TrimPrefix(gitUsername, "gitUsername=")
@@ -364,10 +372,10 @@ func main() {
 
 	// Now that we know what the organization's name is, define its path.
 	organizationPath = filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
-	gitURLToCheck := gitRepoURL + "/" + organizationSelected
+	//gitURLToCheck := gitGroupName + "/" + organizationSelected
 
 	// And we can check if the remote repo exists!
-	exists, err := CheckIfGitLabProjectExists(gitURLToCheck, accessToken)
+	exists, err := CheckIfGitLabProjectExists(organizationSelected, accessToken)
 	if err != nil {
 		fmt.Println("Error checking project existence:", err)
 		return
@@ -375,8 +383,10 @@ func main() {
 
 	if exists {
 		fmt.Println("The project exists.")
+		needToCreateGitRepo = false
 	} else {
 		fmt.Println("The project does not exist.")
+		needToCreateGitRepo = true
 	}
 
 	// # Add some code that'll check to see if the abbreviation has already been set in the remote git repo.
@@ -858,14 +868,15 @@ func main() {
 		fmt.Println(".git directory already exists.")
 	}
 
-	// Create the repo on GitLab.
-	projectURL, err := createGitLabRepo(organizationSelected, accessToken, gitRepoAPIURL, gitGroupID)
-	if err != nil {
-		fmt.Print(redText("\nError creating GitLab project:", err))
-		return
+	// Create the repo on GitLab, if needed.
+	if needToCreateGitRepo {
+		projectURL, err := createGitLabRepo(organizationSelected, accessToken, gitRepoAPIURL, gitGroupID)
+		if err != nil {
+			fmt.Print(redText("\nError creating GitLab project:", err))
+			return
+		}
+		fmt.Println("GitLab project created:", projectURL)
 	}
-
-	fmt.Println("GitLab project created:", projectURL)
 
 	// Commit the changes made and push them to the remote repo.
 	if err := commitAndPush(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
@@ -955,18 +966,20 @@ func ensureDir(path string) error {
 	return nil
 }
 
-func CheckIfGitLabProjectExists(organizationPath, accessToken string) (bool, error) {
+func CheckIfGitLabProjectExists(organizationSelected, accessToken string) (bool, error) {
+
+	urlToCheck := gitRepoAPIURL + gitGroupName + "%2F" + organizationSelected
 
 	// Create a new request
-	req, err := http.NewRequest("GET", gitRepoURL, nil)
+	req, err := http.NewRequest("GET", urlToCheck, nil)
 	if err != nil {
 		return false, err
 	}
 
-	// Add the private token to the request headers for authentication
+	// Add the private token to the request headers for authentication.
 	req.Header.Add("PRIVATE-TOKEN", accessToken)
 
-	// Execute the request
+	// Execute the request.
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -974,17 +987,17 @@ func CheckIfGitLabProjectExists(organizationPath, accessToken string) (bool, err
 	}
 	defer resp.Body.Close()
 
-	// A 404 status code means the project does not exist
+	// A 404 status code means the project does not exist.
 	if resp.StatusCode == 404 {
 		return false, nil
 	}
 
-	// A 200 status code means the project exists
+	// A 200 status code means the project exists.
 	if resp.StatusCode == 200 {
 		return true, nil
 	}
 
-	// For other status codes, read the response body and return it as an error
+	// For other status codes, read the response body and return it as an error.
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false, err
