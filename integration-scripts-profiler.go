@@ -48,6 +48,7 @@ var (
 	accessToken          string
 	organizationSelected string
 	gitGroupID           int
+	gitRepoAPIURL        string
 	gitRepoURL           string
 	gitUsername          string
 	gitEmailAddress      string
@@ -69,11 +70,9 @@ func main() {
 	// Goodies.
 	var input string
 	var scriptsPath string
-	var gitRepoURL string
 	var downloadScriptsOnLanuch bool = true
 	var useCaseNumber bool = true
 	var caseNumber int
-	var gitGroupName string
 	var gitRepoPath string
 	var schedulerSelected string
 	var organizationAbbreviation string
@@ -222,12 +221,11 @@ func main() {
 						} else {
 							fmt.Print("\nYour GitRepo path has been set to ", gitRepoPath)
 						}
-					} else if strings.HasPrefix(line, "gitGroupName =") || strings.HasPrefix(line, "gitGroupName=") {
-						gitGroupName = strings.TrimPrefix(line, "gitGroupName =")
-						gitGroupName = strings.TrimPrefix(gitGroupName, "gitGroupName=")
-						gitGroupName = strings.TrimSpace(gitGroupName)
-						gitGroupName = strings.Trim(gitGroupName, "\"")
-						fmt.Print("\nYour Git group name has been set to ", gitGroupName)
+					} else if strings.HasPrefix(line, "gitRepoAPIURL =") || strings.HasPrefix(line, "gitRepoAPIURL=") {
+						gitRepoAPIURL = strings.TrimPrefix(line, "gitRepoAPIURL =")
+						gitRepoAPIURL = strings.TrimPrefix(gitRepoAPIURL, "gitRepoAPIURL=")
+						gitRepoAPIURL = strings.TrimSpace(gitRepoAPIURL)
+						gitRepoAPIURL = strings.Trim(gitRepoAPIURL, "\"")
 					} else if strings.HasPrefix(line, "gitRepoURL =") || strings.HasPrefix(line, "gitRepoURL=") {
 						gitRepoURL = strings.TrimPrefix(line, "gitRepoURL =")
 						gitRepoURL = strings.TrimPrefix(gitRepoURL, "gitRepoURL=")
@@ -366,7 +364,7 @@ func main() {
 
 	// Now that we know what the organization's name is, define its path.
 	organizationPath = filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
-	gitURLToCheck = (gitGroupName, gitURL...)
+	gitURLToCheck := gitRepoURL + "/" + organizationSelected
 
 	// And we can check if the remote repo exists!
 	exists, err := CheckIfGitLabProjectExists(gitURLToCheck, accessToken)
@@ -861,7 +859,7 @@ func main() {
 	}
 
 	// Create the repo on GitLab.
-	projectURL, err := createGitLabRepo(organizationSelected, accessToken, gitRepoURL, gitGroupID)
+	projectURL, err := createGitLabRepo(organizationSelected, accessToken, gitRepoAPIURL, gitGroupID)
 	if err != nil {
 		fmt.Print(redText("\nError creating GitLab project:", err))
 		return
@@ -958,11 +956,9 @@ func ensureDir(path string) error {
 }
 
 func CheckIfGitLabProjectExists(organizationPath, accessToken string) (bool, error) {
-	// URL-encode the organizationPath to ensure it's HTTP-safe (important for paths with slashes).
-	url := fmt.Sprintf("%s%s", gitRepoURL, organizationPath)
 
 	// Create a new request
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", gitRepoURL, nil)
 	if err != nil {
 		return false, err
 	}
@@ -989,7 +985,7 @@ func CheckIfGitLabProjectExists(organizationPath, accessToken string) (bool, err
 	}
 
 	// For other status codes, read the response body and return it as an error
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false, err
 	}
@@ -1002,8 +998,8 @@ func createLocalGitRepo(folderPath string) error {
 	return err
 }
 
-func createGitLabRepo(projectName, accessToken, gitRepoURL string, namespaceID int) (string, error) {
-	git, err := gitlab.NewClient(accessToken, gitlab.WithBaseURL(gitRepoURL))
+func createGitLabRepo(projectName, accessToken, gitRepoAPIURL string, namespaceID int) (string, error) {
+	git, err := gitlab.NewClient(accessToken, gitlab.WithBaseURL(gitRepoAPIURL))
 	if err != nil {
 		return "", err
 	}
