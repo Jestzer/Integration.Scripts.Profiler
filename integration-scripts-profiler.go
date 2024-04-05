@@ -107,13 +107,13 @@ func main() {
 	// Regexp compile used for detecting things with numbers and letters.
 	lettersAndNumbersPattern, err := regexp.Compile(`^[^a-zA-Z0-9]+$`)
 	if err != nil {
-		fmt.Println(redText("Error compiling regex pattern:", err, " Exiting."))
+		fmt.Println(redText("Error compiling regex pattern: ", err, " Exiting."))
 		os.Exit(1)
 	}
 
 	lettersPattern, err := regexp.Compile(`^[^a-zA-Z]+$`)
 	if err != nil {
-		fmt.Println(redText("Error compiling regex pattern:", err, " Exiting."))
+		fmt.Println(redText("Error compiling regex pattern: ", err, " Exiting."))
 		os.Exit(1)
 	}
 
@@ -217,7 +217,7 @@ func main() {
 
 						// Check if the path exists.
 						if _, err := os.Stat(gitRepoPath); os.IsNotExist(err) {
-							fmt.Print("\nThe specified Git repo path does not exist:", gitRepoPath, ". It will not be used.")
+							fmt.Print("\nThe specified Git repo path does not exist: ", gitRepoPath, ". It will not be used.")
 							gitRepoPath = ""
 						} else {
 							fmt.Print("\nYour Git Repo path has been set to ", gitRepoPath)
@@ -269,7 +269,7 @@ func main() {
 			}
 
 			if err := scanner.Err(); err != nil {
-				fmt.Print(redText("\nError reading settings file:", err, " Default settings will be used instead."))
+				fmt.Print(redText("\nError reading settings file: ", err, " Default settings will be used instead."))
 			}
 		}
 	}
@@ -304,14 +304,14 @@ func main() {
 
 				err := os.RemoveAll(unzipPath)
 				if err != nil {
-					fmt.Print(redText("\nFailed to delete the existing integration scripts directory:", err))
+					fmt.Print(redText("\nFailed to delete the existing integration scripts directory: ", err))
 					continue
 				}
 			}
 
 			err = unzipFile(zipArchivePath, scriptsPath)
 			if err != nil {
-				fmt.Print(redText("\nFailed to extract integration scripts:", err))
+				fmt.Print(redText("\nFailed to extract integration scripts: ", err))
 				continue
 			}
 
@@ -330,7 +330,7 @@ func main() {
 		if _, err := os.Stat(customerEngagementsPath); !os.IsNotExist(err) {
 			files, err := os.ReadDir(customerEngagementsPath)
 			if err != nil {
-				fmt.Print(redText("\nError reading directory:", err))
+				fmt.Print(redText("\nError reading directory: ", err))
 			} else {
 				fmt.Print("\n\nExisting engagements found:\n\n")
 				for _, f := range files {
@@ -360,7 +360,7 @@ func main() {
 			if err.Error() == "Interrupt" {
 				fmt.Println(redText("Exiting from user input."))
 			} else {
-				fmt.Print(redText("Error reading line:", err))
+				fmt.Print(redText("Error reading line: ", err))
 				continue
 			}
 			return
@@ -382,7 +382,7 @@ func main() {
 	// And we can check if the remote repo exists!
 	exists, err := CheckIfGitLabProjectExists(organizationSelected, accessToken)
 	if err != nil {
-		fmt.Println("Error checking project existence:", err)
+		fmt.Println("Error checking project existence: ", err)
 		return
 	}
 
@@ -402,7 +402,7 @@ func main() {
 			if err.Error() == "Interrupt" {
 				fmt.Println(redText("Exiting from user input."))
 			} else {
-				fmt.Print(redText("Error reading line:", err))
+				fmt.Print(redText("Error reading line: ", err))
 				continue
 			}
 			return
@@ -427,7 +427,7 @@ func main() {
 			if _, err := os.Stat(organizationPath); !os.IsNotExist(err) {
 				files, err := os.ReadDir(organizationPath)
 				if err != nil {
-					fmt.Print(redText("\nError reading directory:", err))
+					fmt.Print(redText("\nError reading directory: ", err))
 				} else {
 					fmt.Print("\n\nExisting contacts found:\n\n") // # Add some code to not list anything if no contacts are found.
 					for _, f := range files {
@@ -457,7 +457,7 @@ func main() {
 				if err.Error() == "Interrupt" {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line:", err))
+					fmt.Print(redText("Error reading line: ", err))
 					continue
 				}
 				return
@@ -484,7 +484,7 @@ func main() {
 				if err.Error() == "Interrupt" {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line:", err))
+					fmt.Print(redText("Error reading line: ", err))
 					continue
 				}
 				return
@@ -519,7 +519,7 @@ func main() {
 			if err.Error() == "Interrupt" {
 				fmt.Println(redText("Exiting from user input."))
 			} else {
-				fmt.Print(redText("Error reading line:", err))
+				fmt.Print(redText("Error reading line: ", err))
 				continue
 			}
 			return
@@ -554,7 +554,7 @@ func main() {
 				if err.Error() == "Interrupt" {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line:", err))
+					fmt.Print(redText("Error reading line: ", err))
 					continue
 				}
 				return
@@ -592,7 +592,7 @@ func main() {
 				if err.Error() == "Interrupt" {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line:", err))
+					fmt.Print(redText("Error reading line: ", err))
 					continue
 				}
 				return
@@ -629,7 +629,7 @@ func main() {
 				if err.Error() == "Interrupt" {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line:", err))
+					fmt.Print(redText("Error reading line: ", err))
 					continue
 				}
 				return
@@ -660,7 +660,7 @@ func main() {
 				if err.Error() == "Interrupt" {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line:", err))
+					fmt.Print(redText("Error reading line: ", err))
 					continue
 				}
 				return
@@ -697,7 +697,7 @@ func main() {
 				if err.Error() == "Interrupt" {
 					fmt.Println(redText("Exiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line:", err))
+					fmt.Print(redText("Error reading line: ", err))
 					continue
 				}
 				return
@@ -734,7 +734,7 @@ func main() {
 					if err.Error() == "Interrupt" {
 						fmt.Println(redText("Exiting from user input."))
 					} else {
-						fmt.Print(redText("Error reading line:", err))
+						fmt.Print(redText("Error reading line: ", err))
 						continue
 					}
 					return
@@ -761,7 +761,7 @@ func main() {
 					if err.Error() == "Interrupt" {
 						fmt.Println(redText("Exiting from user input."))
 					} else {
-						fmt.Print(redText("Error reading line:", err))
+						fmt.Print(redText("Error reading line: ", err))
 						continue
 					}
 					return
@@ -783,7 +783,7 @@ func main() {
 					if err.Error() == "Interrupt" {
 						fmt.Println(redText("Exiting from user input."))
 					} else {
-						fmt.Print(redText("Error reading line:", err))
+						fmt.Print(redText("Error reading line: ", err))
 						continue
 					}
 					return
@@ -805,7 +805,7 @@ func main() {
 					if err.Error() == "Interrupt" {
 						fmt.Println(redText("Exiting from user input."))
 					} else {
-						fmt.Print(redText("Error reading line:", err))
+						fmt.Print(redText("Error reading line: ", err))
 						continue
 					}
 					return
@@ -854,23 +854,23 @@ func main() {
 
 	file, err := os.Create(testFilePath)
 	if err != nil {
-		fmt.Println("Error creating file:", err)
+		fmt.Println("Error creating file: ", err)
 		return
 	}
 	defer file.Close()
 
-	fmt.Println("Blank file 'testing' created successfully at:", testFilePath)
+	fmt.Println("Blank file 'testing' created successfully at: ", testFilePath)
 
 	// Create the local repo, if needed.
 	organizationDotGitFolder := filepath.Join(organizationPath, ".git")
 
 	if _, err := os.Stat(organizationDotGitFolder); os.IsNotExist(err) {
 		if err := createLocalGitRepo(organizationPath); err != nil {
-			fmt.Println("Error creating local Git repo:", err)
+			fmt.Println("Error creating local Git repo: ", err)
 			os.Exit(1)
 		}
 	} else if err != nil {
-		fmt.Print(redText("\nError checking if .git directory exists:", err))
+		fmt.Print(redText("\nError checking if .git directory exists: ", err))
 		return
 	} else {
 		// The .git directory exists, no action needed
@@ -881,10 +881,10 @@ func main() {
 	if needToCreateGitRepo {
 		projectURL, err := createGitLabRepo(organizationSelected, accessToken, gitRepoAPIURL, gitGroupID)
 		if err != nil {
-			fmt.Print(redText("\nError creating GitLab project:", err))
+			fmt.Print(redText("\nError creating GitLab project: ", err))
 			return
 		}
-		fmt.Println("GitLab project created:", projectURL)
+		fmt.Println("GitLab project created: ", projectURL)
 	}
 
 	// Commit the changes made and push them to the remote repo.
