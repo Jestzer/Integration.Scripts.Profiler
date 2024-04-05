@@ -228,9 +228,14 @@ func main() {
 						gitRepoAPIURL = strings.TrimSpace(gitRepoAPIURL)
 						gitRepoAPIURL = strings.Trim(gitRepoAPIURL, "\"")
 
-						// We want the URL to end with a / for later Git repo usage.
-						if !strings.HasSuffix(gitRepoAPIURL, "/") {
+						// We want the URL to end with "projects/"" for later Git repo usage.
+						if strings.HasSuffix(gitRepoAPIURL, "projects") {
 							gitRepoAPIURL += "/"
+						} else if strings.HasSuffix(gitRepoAPIURL, "projects/") {
+							// Do nothing.
+						} else if strings.HasSuffix(gitRepoAPIURL, "/") {
+							gitRepoAPIURL = gitRepoAPIURL[:len(gitRepoAPIURL)-1]
+							gitRepoAPIURL += "/projects"
 						}
 
 						fmt.Print("\nYour Git API URL has been set to ", gitRepoAPIURL)
@@ -829,11 +834,15 @@ func main() {
 		}
 
 		// This is where Big Things Part 1(tm) will happen.
+		// These are just here for now to make Go shut the hell up.
 		if useCaseNumber {
 			fmt.Print("Case number: ", caseNumber, "\n")
 		}
 		if customMPI {
 			fmt.Print("you did it. custom mpi. yipee.")
+		}
+		if remoteJobStorageLocation != "" {
+			fmt.Print("omg remotejobstl: ", remoteJobStorageLocation, "\n")
 		}
 		fmt.Print("Finished script creation for cluster #", i, "!\n")
 	}
@@ -987,7 +996,6 @@ func CheckIfGitLabProjectExists(organizationSelected, accessToken string) (bool,
 	}
 	defer resp.Body.Close()
 
-	// A 404 status code means the project does not exist.
 	if resp.StatusCode == 404 {
 		return false, nil
 	}
@@ -1012,7 +1020,8 @@ func createLocalGitRepo(folderPath string) error {
 }
 
 func createGitLabRepo(projectName, accessToken, gitRepoAPIURL string, namespaceID int) (string, error) {
-	git, err := gitlab.NewClient(accessToken, gitlab.WithBaseURL(gitRepoAPIURL))
+	gitRepoAPIWithNoProjectURL := gitRepoAPIURL[:len(gitRepoAPIURL)-9]
+	git, err := gitlab.NewClient(accessToken, gitlab.WithBaseURL(gitRepoAPIWithNoProjectURL))
 	if err != nil {
 		return "", err
 	}
@@ -1037,7 +1046,9 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 
 	_, err = r.CreateRemote(&config.RemoteConfig{
 		Name: "main",
-		URLs: []string{fmt.Sprintf("git@gitlab.com:%s/%s.git", gitUsername, projectName)},
+		// Note to future self: check to make sure this URL is coming out correctly.
+		// Current error: invalid pkt-len found
+		URLs: []string{fmt.Sprintf("https://insidelabs-git.mathworks.com/%s/%s.git", gitUsername, projectName)},
 	})
 	if err != nil && !strings.Contains(err.Error(), "remote already exists") {
 		return err
@@ -1065,11 +1076,16 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 		return err
 	}
 
-	return r.Push(&git.PushOptions{
+	err = r.Push(&git.PushOptions{
 		RemoteName: "main",
 		Auth: &githttp.BasicAuth{
 			Username: gitUsername,
 			Password: accessToken,
 		},
 	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
