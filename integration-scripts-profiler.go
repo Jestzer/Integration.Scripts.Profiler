@@ -860,14 +860,14 @@ func main() {
 	}
 	defer file.Close()
 
-	fmt.Println("Blank file 'testing' created successfully at: ", testFilePath)
+	fmt.Println("Blank file 'testing' created successfully at:", testFilePath)
 
 	// Create the local repo, if needed.
 	organizationDotGitFolder := filepath.Join(organizationPath, ".git")
 
 	if _, err := os.Stat(organizationDotGitFolder); os.IsNotExist(err) {
 		if err := createLocalGitRepo(organizationPath); err != nil {
-			fmt.Println("Error creating local Git repo: ", err)
+			fmt.Println(redText("Error creating local Git repo:", err))
 			os.Exit(1)
 		}
 	} else if err != nil {
@@ -1016,8 +1016,65 @@ func CheckIfGitLabProjectExists(organizationSelected, accessToken string) (bool,
 }
 
 func createLocalGitRepo(folderPath string) error {
-	_, err := git.PlainInit(folderPath, false)
-	return err
+	// Initialize a new repository
+	r, err := git.PlainInit(folderPath, false)
+	if err != nil {
+		return err
+	}
+
+	// Work with the repository's worktree
+	w, err := r.Worktree()
+	if err != nil {
+		return err
+	}
+
+	// Add all files in the folder to the staging area
+	// Note: "." adds all files in the directory
+	err = w.AddWithOptions(&git.AddOptions{All: true})
+	if err != nil {
+		return err
+	}
+
+	// Check if there are any changes staged
+	status, err := w.Status()
+	if err != nil {
+		return err
+	}
+	if status.IsClean() {
+		fmt.Println("No changes to commit.")
+		return nil // No changes, so no commit is made
+	}
+
+	// Make an initial commit to the "main" branch
+	_, err = w.Commit("Initial commit.", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  gitUsername,
+			Email: gitEmailAddress,
+			When:  time.Now(),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	// Create a new "main" branch reference pointing to the commit just created
+	headRef, err := r.Head()
+	if err != nil {
+		return err
+	}
+	mainRef := plumbing.NewHashReference(plumbing.NewBranchReferenceName("main"), headRef.Hash())
+	err = r.Storer.SetReference(mainRef)
+	if err != nil {
+		return err
+	}
+
+	// Update HEAD to point to the "main" branch
+	err = r.Storer.SetReference(plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.NewBranchReferenceName("main")))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func createGitLabRepo(projectName, accessToken, gitRepoAPIURL string, namespaceID int) (string, error) {
@@ -1041,6 +1098,7 @@ func createGitLabRepo(projectName, accessToken, gitRepoAPIURL string, namespaceI
 
 func commitAndPush(folderPath, projectName, gitUsername, accessToken string) error {
 	constructedURL := fmt.Sprintf("https://insidelabs-git.mathworks.com/%s/%s.git", gitGroupName, projectName)
+	remoteChangesExist := false
 
 	// Make our lives easier.
 	fmt.Printf("\nProject URL to commit to: %s", constructedURL)
@@ -1069,16 +1127,30 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 		return err
 	}
 
-	// Commit the changes.
-	_, err = w.Commit("Initial commit.", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  gitUsername,
-			Email: gitEmailAddress,
-			When:  time.Now(),
-		},
-	})
+	// Check if there are any changes staged
+	status, err := w.Status()
 	if err != nil {
 		return err
+	}
+	if status.IsClean() {
+		fmt.Print("\nNo changes to commit remotely.")
+
+	} else {
+		remoteChangesExist = true
+	}
+
+	if remoteChangesExist {
+		// Commit the changes.
+		_, err = w.Commit("Initial commit.", &git.CommitOptions{
+			Author: &object.Signature{
+				Name:  gitUsername,
+				Email: gitEmailAddress,
+				When:  time.Now(),
+			},
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	// Get the HEAD reference for the commit.
