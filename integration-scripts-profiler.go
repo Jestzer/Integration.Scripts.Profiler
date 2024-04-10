@@ -1016,20 +1016,19 @@ func CheckIfGitLabProjectExists(organizationSelected, accessToken string) (bool,
 }
 
 func createLocalGitRepo(folderPath string) error {
-	// Initialize a new repository
+
 	r, err := git.PlainInit(folderPath, false)
 	if err != nil {
 		return err
 	}
 
-	// Work with the repository's worktree
+	// Work with the repository's worktree.
 	w, err := r.Worktree()
 	if err != nil {
 		return err
 	}
 
-	// Add all files in the folder to the staging area
-	// Note: "." adds all files in the directory
+	// Add all files in the folder to the staging area.
 	err = w.AddWithOptions(&git.AddOptions{All: true})
 	if err != nil {
 		return err
@@ -1141,7 +1140,7 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 
 	if remoteChangesExist {
 		// Commit the changes.
-		_, err = w.Commit("Initial commit.", &git.CommitOptions{
+		_, err = w.Commit("Added R2024a scripts.", &git.CommitOptions{
 			Author: &object.Signature{
 				Name:  gitUsername,
 				Email: gitEmailAddress,
