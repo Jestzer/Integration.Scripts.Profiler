@@ -20,6 +20,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/xanzy/go-gitlab"
@@ -107,13 +108,13 @@ func main() {
 	// Regexp compile used for detecting things with numbers and letters.
 	lettersAndNumbersPattern, err := regexp.Compile(`^[^a-zA-Z0-9]+$`)
 	if err != nil {
-		fmt.Println(redText("Error compiling regex pattern: ", err, " Exiting."))
+		fmt.Print(redText("\nError compiling regex pattern: ", err, " Exiting."))
 		os.Exit(1)
 	}
 
 	lettersPattern, err := regexp.Compile(`^[^a-zA-Z]+$`)
 	if err != nil {
-		fmt.Println(redText("Error compiling regex pattern: ", err, " Exiting."))
+		fmt.Print(redText("\nError compiling regex pattern: ", err, " Exiting."))
 		os.Exit(1)
 	}
 
@@ -382,15 +383,15 @@ func main() {
 	// And we can check if the remote repo exists!
 	exists, err := CheckIfGitLabProjectExists(organizationSelected, accessToken)
 	if err != nil {
-		fmt.Println("Error checking project existence: ", err)
+		fmt.Print("\nError checking project existence: ", err)
 		return
 	}
 
 	if exists {
-		fmt.Println("The project exists.")
+		fmt.Print("\nThe project exists.")
 		needToCreateGitRepo = false
 	} else {
-		fmt.Println("The project does not exist.")
+		fmt.Print("\nThe project does not exist.")
 		needToCreateGitRepo = true
 	}
 
@@ -400,9 +401,9 @@ func main() {
 		organizationAbbreviation, err = rl.Readline()
 		if err != nil {
 			if err.Error() == "Interrupt" {
-				fmt.Println(redText("Exiting from user input."))
+				fmt.Print(redText("\nExiting from user input."))
 			} else {
-				fmt.Print(redText("Error reading line: ", err))
+				fmt.Print(redText("\nError reading line: ", err))
 				continue
 			}
 			return
@@ -455,9 +456,9 @@ func main() {
 			organizationContact, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
-					fmt.Println(redText("Exiting from user input."))
+					fmt.Print(redText("\nExiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line: ", err))
+					fmt.Print(redText("\nError reading line: ", err))
 					continue
 				}
 				return
@@ -482,9 +483,9 @@ func main() {
 			input, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
-					fmt.Println(redText("Exiting from user input."))
+					fmt.Print(redText("\nExiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line: ", err))
+					fmt.Print(redText("\nError reading line: ", err))
 					continue
 				}
 				return
@@ -498,15 +499,15 @@ func main() {
 			} else if _, err := strconv.Atoi(input); err == nil && input != "" { // # Add som code to do something with the potential error message.
 				caseNumber, _ = strconv.Atoi(input)
 				if caseNumber < 01000000 {
-					fmt.Print(redText("Are you sure that's the right Case Number? It seems a bit too small.\n"))
+					fmt.Print(redText("\nAre you sure that's the right Case Number? It seems a bit too small.\n"))
 					continue
 				} else if caseNumber > 20000000 {
-					fmt.Print(redText("Are you sure that's the right Case Number? It seems a bit too large.\n"))
+					fmt.Print(redText("\nAre you sure that's the right Case Number? It seems a bit too large.\n"))
 					continue
 				}
 				break
 			} else {
-				fmt.Print(redText("Invalid entry. "))
+				fmt.Print(redText("\nInvalid entry. "))
 				continue
 			}
 		}
@@ -517,9 +518,9 @@ func main() {
 		input, err = rl.Readline()
 		if err != nil {
 			if err.Error() == "Interrupt" {
-				fmt.Println(redText("Exiting from user input."))
+				fmt.Print(redText("\nExiting from user input."))
 			} else {
-				fmt.Print(redText("Error reading line: ", err))
+				fmt.Print(redText("\nError reading line: ", err))
 				continue
 			}
 			return
@@ -535,12 +536,12 @@ func main() {
 		if _, err := strconv.Atoi(input); err == nil {
 			clusterCount, _ = strconv.Atoi(input)
 			if clusterCount < 1 {
-				fmt.Print(redText("Invalid entry. You've selected zero or less clusters to create scripts for.\n"))
+				fmt.Print(redText("\nInvalid entry. You've selected zero or less clusters to create scripts for.\n"))
 				continue
 			}
 			break
 		} else {
-			fmt.Print(redText("Invalid entry. Please enter an integer greater than zero.\n"))
+			fmt.Print(redText("\nInvalid entry. Please enter an integer greater than zero.\n"))
 			continue
 		}
 	}
@@ -552,9 +553,9 @@ func main() {
 			clusterName, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
-					fmt.Println(redText("Exiting from user input."))
+					fmt.Print(redText("\nExiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line: ", err))
+					fmt.Print(redText("\nError reading line: ", err))
 					continue
 				}
 				return
@@ -565,7 +566,7 @@ func main() {
 				clusterName = "HPC"
 				break
 			} else if lettersAndNumbersPattern.MatchString(clusterName) && clusterName != "" {
-				fmt.Print(redText("Invalid input. You must include at least 1 letter or number in the cluster's name.\n"))
+				fmt.Print(redText("\nInvalid input. You must include at least 1 letter or number in the cluster's name.\n"))
 				continue
 			} else {
 				break
@@ -590,9 +591,9 @@ func main() {
 			schedulerSelected, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
-					fmt.Println(redText("Exiting from user input."))
+					fmt.Print(redText("\nExiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line: ", err))
+					fmt.Print(redText("\nError reading line: ", err))
 					continue
 				}
 				return
@@ -627,9 +628,9 @@ func main() {
 			customMPIInput, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
-					fmt.Println(redText("Exiting from user input."))
+					fmt.Print(redText("\nExiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line: ", err))
+					fmt.Print(redText("\nError reading line: ", err))
 					continue
 				}
 				return
@@ -658,9 +659,9 @@ func main() {
 			submissionType, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
-					fmt.Println(redText("Exiting from user input."))
+					fmt.Print(redText("\nExiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line: ", err))
+					fmt.Print(redText("\nError reading line: ", err))
 					continue
 				}
 				return
@@ -683,7 +684,7 @@ func main() {
 			} else if submissionType == "cluster" || submissionType == "desktop" || submissionType == "both" {
 				break
 			} else {
-				fmt.Print(redText("Invalid entry. Enter a number between 1-3 to select a submission type.\n"))
+				fmt.Print(redText("\nInvalid entry. Enter a number between 1-3 to select a submission type.\n"))
 				continue
 			}
 		}
@@ -695,9 +696,9 @@ func main() {
 			input, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
-					fmt.Println(redText("Exiting from user input."))
+					fmt.Print(redText("\nExiting from user input."))
 				} else {
-					fmt.Print(redText("Error reading line: ", err))
+					fmt.Print(redText("\nError reading line: ", err))
 					continue
 				}
 				return
@@ -714,10 +715,10 @@ func main() {
 			if _, err := strconv.Atoi(input); err == nil {
 				numberOfWorkers, _ = strconv.Atoi(input)
 				if numberOfWorkers < 1 {
-					fmt.Print(redText("Invalid entry. You've selected zero or less workers.\n"))
+					fmt.Print(redText("\nInvalid entry. You've selected zero or less workers.\n"))
 					continue
 				} else if numberOfWorkers > 100000 {
-					fmt.Print(redText("Invalid entry. You've selected more than 100000 workers, which is not offered on any license.\n"))
+					fmt.Print(redText("\nInvalid entry. You've selected more than 100000 workers, which is not offered on any license.\n"))
 					continue
 				}
 				break
@@ -732,9 +733,9 @@ func main() {
 				input, err = rl.Readline()
 				if err != nil {
 					if err.Error() == "Interrupt" {
-						fmt.Println(redText("Exiting from user input."))
+						fmt.Print(redText("\nExiting from user input."))
 					} else {
-						fmt.Print(redText("Error reading line: ", err))
+						fmt.Print(redText("\nError reading line: ", err))
 						continue
 					}
 					return
@@ -759,9 +760,9 @@ func main() {
 				clusterMatlabRoot, err = rl.Readline()
 				if err != nil {
 					if err.Error() == "Interrupt" {
-						fmt.Println(redText("Exiting from user input."))
+						fmt.Print(redText("\nExiting from user input."))
 					} else {
-						fmt.Print(redText("Error reading line: ", err))
+						fmt.Print(redText("\nError reading line: ", err))
 						continue
 					}
 					return
@@ -771,7 +772,7 @@ func main() {
 				if strings.Contains(clusterMatlabRoot, "/") || strings.Contains(clusterMatlabRoot, "\\") {
 					break
 				} else {
-					fmt.Print(redText("Invalid filepath. "))
+					fmt.Print(redText("\nInvalid filepath. "))
 					continue
 				}
 			}
@@ -781,9 +782,9 @@ func main() {
 				clusterHostname, err = rl.Readline()
 				if err != nil {
 					if err.Error() == "Interrupt" {
-						fmt.Println(redText("Exiting from user input."))
+						fmt.Print(redText("\nExiting from user input."))
 					} else {
-						fmt.Print(redText("Error reading line: ", err))
+						fmt.Print(redText("\nError reading line: ", err))
 						continue
 					}
 					return
@@ -803,9 +804,9 @@ func main() {
 				remoteJobStorageLocation, err = rl.Readline()
 				if err != nil {
 					if err.Error() == "Interrupt" {
-						fmt.Println(redText("Exiting from user input."))
+						fmt.Print(redText("\nExiting from user input."))
 					} else {
-						fmt.Print(redText("Error reading line: ", err))
+						fmt.Print(redText("\nError reading line: ", err))
 						continue
 					}
 					return
@@ -818,19 +819,19 @@ func main() {
 					remoteJobStorageLocation = "/home/$USER/.matlab/generic_cluster_jobs/" + clusterName + "/$HOST"
 					break
 				} else {
-					fmt.Print(redText("Invalid filepath. "))
+					fmt.Print(redText("\nInvalid filepath. "))
 					continue
 				}
 			}
 		}
-		fmt.Print("Creating integration scripts for cluster #", i, "...\n")
+		fmt.Print("\nCreating integration scripts for cluster #", i, "...\n")
 
 		// Create the organization's directory, if it's not already in existence.
 		err := ensureDir(organizationPath)
 		if err != nil {
-			fmt.Printf("Error creating directory: %s\n", err)
+			fmt.Printf("\nError creating directory: %s\n", err)
 		} else {
-			fmt.Println("Organization directory created!")
+			fmt.Print("\nOrganization directory created!")
 		}
 
 		// This is where Big Things Part 1(tm) will happen.
@@ -893,7 +894,7 @@ func main() {
 		return
 	}
 
-	fmt.Println("Pushed to GitLab successfully.")
+	fmt.Println("\nPushed to GitLab successfully.")
 	fmt.Print("Finished!\n")
 }
 
@@ -1039,16 +1040,19 @@ func createGitLabRepo(projectName, accessToken, gitRepoAPIURL string, namespaceI
 }
 
 func commitAndPush(folderPath, projectName, gitUsername, accessToken string) error {
+	constructedURL := fmt.Sprintf("https://insidelabs-git.mathworks.com/%s/%s.git", gitGroupName, projectName)
+
+	// Make our lives easier.
+	fmt.Printf("\nProject URL to commit to: %s", constructedURL)
+
 	r, err := git.PlainOpen(folderPath)
 	if err != nil {
 		return err
 	}
 
 	_, err = r.CreateRemote(&config.RemoteConfig{
-		Name: "main",
-		// Note to future self: check to make sure this URL is coming out correctly.
-		// Current error: invalid pkt-len found
-		URLs: []string{fmt.Sprintf("https://insidelabs-git.mathworks.com/%s/%s.git", gitUsername, projectName)},
+		Name: "origin", // Typically, the default remote is named "origin"
+		URLs: []string{constructedURL},
 	})
 	if err != nil && !strings.Contains(err.Error(), "remote already exists") {
 		return err
@@ -1065,7 +1069,8 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 		return err
 	}
 
-	_, err = w.Commit("Initial commit", &git.CommitOptions{
+	// Commit the changes.
+	_, err = w.Commit("Initial commit.", &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  gitUsername,
 			Email: gitEmailAddress,
@@ -1076,8 +1081,27 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 		return err
 	}
 
+	// Get the HEAD reference for the commit.
+	headRef, err := r.Head()
+	if err != nil {
+		return err
+	}
+
+	// Create a new "main" branch reference pointing to the same commit as "HEAD".
+	mainRef := plumbing.NewHashReference("refs/heads/main", headRef.Hash())
+
+	// Save the new "main" branch reference.
+	err = r.Storer.SetReference(mainRef)
+	if err != nil {
+		return err
+	}
+
+	// Push the main branch to the remote branch.
 	err = r.Push(&git.PushOptions{
-		RemoteName: "main",
+		RemoteName: "origin",
+		RefSpecs: []config.RefSpec{
+			"refs/heads/main:refs/heads/main",
+		},
 		Auth: &githttp.BasicAuth{
 			Username: gitUsername,
 			Password: accessToken,
