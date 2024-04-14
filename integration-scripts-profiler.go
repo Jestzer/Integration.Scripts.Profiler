@@ -46,15 +46,16 @@ func (f *FolderCompleter) Do(line []rune, pos int) (newLine [][]rune, length int
 
 // Cross-function variables.
 var (
-	accessToken          string
-	organizationSelected string
-	gitGroupID           int
-	gitRepoAPIURL        string
-	gitGroupName         string
-	gitUsername          string
-	gitEmailAddress      string
-	needToCreateGitRepo  bool
-	organizationPath     string
+	accessToken              string
+	organizationSelected     string
+	gitGroupID               int
+	gitRepoAPIURL            string
+	gitGroupName             string
+	gitUsername              string
+	gitEmailAddress          string
+	needToCreateGitRepo      bool
+	organizationPath         string
+	organizationAbbreviation string
 )
 
 func main() {
@@ -77,7 +78,6 @@ func main() {
 	var caseNumber int
 	var gitRepoPath string
 	var schedulerSelected string
-	var organizationAbbreviation string
 	var organizationContact string
 	var customMPIInput string
 	var customMPI bool
@@ -979,6 +979,7 @@ func ensureDir(path string) error {
 func CheckIfGitLabProjectExists(organizationSelected, accessToken string) (bool, error) {
 
 	urlToCheck := gitRepoAPIURL + gitGroupName + "%2F" + organizationSelected
+	fmt.Print("\nChecking this project to see if it exists: " + urlToCheck)
 
 	// Create a new request
 	req, err := http.NewRequest("GET", urlToCheck, nil)
@@ -1041,7 +1042,7 @@ func createLocalGitRepo(folderPath string) error {
 	}
 	if status.IsClean() {
 		fmt.Println("No changes to commit.")
-		return nil // No changes, so no commit is made
+		return nil
 	}
 
 	// Make an initial commit to the "main" branch
@@ -1083,11 +1084,20 @@ func createGitLabRepo(projectName, accessToken, gitRepoAPIURL string, namespaceI
 		return "", err
 	}
 
+	// Create the project.
 	project, _, err := git.Projects.CreateProject(&gitlab.CreateProjectOptions{
 		Name:        &projectName,
-		NamespaceID: gitlab.Ptr(namespaceID), // Specify the namespace ID here
+		NamespaceID: gitlab.Ptr(namespaceID),
 	})
+	if err != nil {
+		return "", err
+	}
 
+	// Create its abbreviation variable.
+	_, _, err = git.ProjectVariables.CreateVariable(project.ID, &gitlab.CreateProjectVariableOptions{
+		Key:   gitlab.Ptr("abbreviation"),
+		Value: gitlab.Ptr(organizationAbbreviation),
+	})
 	if err != nil {
 		return "", err
 	}
@@ -1097,9 +1107,6 @@ func createGitLabRepo(projectName, accessToken, gitRepoAPIURL string, namespaceI
 
 func commitAndPush(folderPath, projectName, gitUsername, accessToken string) error {
 	constructedURL := fmt.Sprintf("https://insidelabs-git.mathworks.com/%s/%s.git", gitGroupName, projectName)
-	remoteChangesExist := false
-
-	// Make our lives easier.
 	fmt.Printf("\nProject URL to commit to: %s", constructedURL)
 
 	r, err := git.PlainOpen(folderPath)
@@ -1107,12 +1114,17 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 		return err
 	}
 
-	_, err = r.CreateRemote(&config.RemoteConfig{
-		Name: "origin", // Typically, the default remote is named "origin"
-		URLs: []string{constructedURL},
-	})
-	if err != nil && !strings.Contains(err.Error(), "remote already exists") {
-		return err
+	// Check if the remote branch "origin" already exists.
+	_, err = r.Remote("origin")
+	if err != nil {
+		// Create it if it doesn't exist.
+		_, err = r.CreateRemote(&config.RemoteConfig{
+			Name: "origin",
+			URLs: []string{constructedURL},
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	w, err := r.Worktree()
@@ -1126,53 +1138,31 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 		return err
 	}
 
-	// Check if there are any changes staged
+	// Check if there are any changes staged.
 	status, err := w.Status()
 	if err != nil {
 		return err
 	}
 	if status.IsClean() {
-		fmt.Print("\nNo changes to commit remotely.")
-
-	} else {
-		remoteChangesExist = true
+		fmt.Println("\nNo changes to commit remotely.")
+		return nil
 	}
 
-	if remoteChangesExist {
-		// Commit the changes.
-		_, err = w.Commit("Added R2024a scripts.", &git.CommitOptions{
-			Author: &object.Signature{
-				Name:  gitUsername,
-				Email: gitEmailAddress,
-				When:  time.Now(),
-			},
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	// Get the HEAD reference for the commit.
-	headRef, err := r.Head()
+	// Commit the changes
+	_, err = w.Commit("Added R2024a scripts.", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  gitUsername,
+			Email: gitEmailAddress,
+			When:  time.Now(),
+		},
+	})
 	if err != nil {
 		return err
 	}
 
-	// Create a new "main" branch reference pointing to the same commit as "HEAD".
-	mainRef := plumbing.NewHashReference("refs/heads/main", headRef.Hash())
-
-	// Save the new "main" branch reference.
-	err = r.Storer.SetReference(mainRef)
-	if err != nil {
-		return err
-	}
-
-	// Push the main branch to the remote branch.
+	// Push the changes to the remote
 	err = r.Push(&git.PushOptions{
 		RemoteName: "origin",
-		RefSpecs: []config.RefSpec{
-			"refs/heads/main:refs/heads/main",
-		},
 		Auth: &githttp.BasicAuth{
 			Username: gitUsername,
 			Password: accessToken,
