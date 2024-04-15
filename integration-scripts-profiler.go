@@ -46,16 +46,17 @@ func (f *FolderCompleter) Do(line []rune, pos int) (newLine [][]rune, length int
 
 // Cross-function variables.
 var (
-	accessToken              string
-	organizationSelected     string
-	gitGroupID               int
-	gitRepoAPIURL            string
-	gitGroupName             string
-	gitUsername              string
-	gitEmailAddress          string
-	needToCreateGitRepo      bool
-	organizationPath         string
-	organizationAbbreviation string
+	accessToken                  string
+	organizationSelected         string
+	gitExistingRepoCommitMessage string
+	gitGroupID                   int
+	gitRepoAPIURL                string
+	gitGroupName                 string
+	gitUsername                  string
+	gitEmailAddress              string
+	needToCreateGitRepo          bool
+	organizationPath             string
+	organizationAbbreviation     string
 )
 
 func main() {
@@ -208,8 +209,13 @@ func main() {
 						if _, err := strconv.Atoi(gitGroupIDString); err == nil {
 							gitGroupID, _ = strconv.Atoi(gitGroupIDString)
 						}
-
 						fmt.Print("\nYour Git group ID has been set to ", gitGroupID)
+					} else if strings.HasPrefix(line, "gitExistingRepoCommitMessage =") || strings.HasPrefix(line, "gitExistingRepoCommitMessage=") {
+						gitExistingRepoCommitMessage = strings.TrimPrefix(line, "gitExistingRepoCommitMessage =")
+						gitExistingRepoCommitMessage = strings.TrimPrefix(gitExistingRepoCommitMessage, "gitExistingRepoCommitMessage=")
+						gitExistingRepoCommitMessage = strings.TrimSpace(gitExistingRepoCommitMessage)
+						gitExistingRepoCommitMessage = strings.Trim(gitExistingRepoCommitMessage, "\"")
+						fmt.Print("\nYour existing Git repo commit message has been set to \"", gitExistingRepoCommitMessage, "\"")
 					} else if strings.HasPrefix(line, "gitRepoPath =") || strings.HasPrefix(line, "gitRepoPath=") {
 						gitRepoPath = strings.TrimPrefix(line, "gitRepoPath =")
 						gitRepoPath = strings.TrimPrefix(gitRepoPath, "gitRepoPath=")
@@ -378,17 +384,16 @@ func main() {
 
 	// Now that we know what the organization's name is, define its path.
 	organizationPath = filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
-	//gitURLToCheck := gitGroupName + "/" + organizationSelected
 
-	// And we can check if the remote repo exists!
-	exists, err := CheckIfGitLabProjectExists(organizationSelected, accessToken)
+	// And we can check if the remote repo exists! Fetch it now!
+	exists, err := CheckIfGitLabProjectExistsAndFetch(organizationSelected, accessToken, organizationPath)
 	if err != nil {
-		fmt.Print("\nError checking project existence: ", err)
+		fmt.Print(redText("\nError checking project existence: ", err))
 		return
 	}
 
 	if exists {
-		fmt.Print("\nThe project exists.")
+		// I've probably printed enough messages about the repo existing at this point, so I won't anymore.
 		needToCreateGitRepo = false
 	} else {
 		fmt.Print("\nThe project does not exist.")
@@ -829,7 +834,7 @@ func main() {
 		// Create the organization's directory, if it's not already in existence.
 		err := ensureDir(organizationPath)
 		if err != nil {
-			fmt.Printf("\nError creating directory: %s\n", err)
+			fmt.Printf("\nError creating directory: %s", err)
 		} else {
 			fmt.Print("\nOrganization directory created!")
 		}
@@ -837,17 +842,17 @@ func main() {
 		// This is where Big Things Part 1(tm) will happen.
 		// These are just here for now to make Go shut the hell up.
 		if useCaseNumber {
-			fmt.Print("Case number: ", caseNumber, "\n")
+			fmt.Print("\nCase number: ", caseNumber)
 		}
 		if customMPI {
-			fmt.Print("you did it. custom mpi. yipee.")
+			fmt.Print("\nyou did it. custom mpi. yipee.")
 		}
 		if remoteJobStorageLocation != "" {
-			fmt.Print("omg remotejobstl: ", remoteJobStorageLocation, "\n")
+			fmt.Print("\nomg remotejobstl: ", remoteJobStorageLocation)
 		}
-		fmt.Print("Finished script creation for cluster #", i, "!\n")
+		fmt.Print("\nFinished script creation for cluster #", i, "!")
 	}
-	fmt.Print("Submitting to your remote Git repo...\n")
+	fmt.Print("\nSubmitting to your remote Git repo...")
 	// This is where Big Things Part 2(tm) will happen (sort of.)
 
 	// Create testing file, for now.
@@ -855,19 +860,19 @@ func main() {
 
 	file, err := os.Create(testFilePath)
 	if err != nil {
-		fmt.Println("Error creating file: ", err)
+		fmt.Print(redText("\nError creating file: ", err))
 		return
 	}
 	defer file.Close()
 
-	fmt.Println("Blank file 'testing' created successfully at:", testFilePath)
+	fmt.Print("\nBlank file 'testing' created successfully at:", testFilePath)
 
 	// Create the local repo, if needed.
 	organizationDotGitFolder := filepath.Join(organizationPath, ".git")
 
 	if _, err := os.Stat(organizationDotGitFolder); os.IsNotExist(err) {
 		if err := createLocalGitRepo(organizationPath); err != nil {
-			fmt.Println(redText("Error creating local Git repo:", err))
+			fmt.Println(redText("\nError creating local Git repo:", err))
 			os.Exit(1)
 		}
 	} else if err != nil {
@@ -885,7 +890,7 @@ func main() {
 			fmt.Print(redText("\nError creating GitLab project: ", err))
 			return
 		}
-		fmt.Println("GitLab project created: ", projectURL)
+		fmt.Print("\nGitLab project created: ", projectURL)
 	}
 
 	// Commit the changes made and push them to the remote repo.
@@ -894,8 +899,8 @@ func main() {
 		return
 	}
 
-	fmt.Println("\nPushed to GitLab successfully.")
-	fmt.Print("Finished!\n")
+	fmt.Print("\nPushed to GitLab successfully.")
+	fmt.Print("\nFinished!")
 }
 
 // Function to download a file from a given URL and save it to the specified path.
@@ -976,10 +981,11 @@ func ensureDir(path string) error {
 	return nil
 }
 
-func CheckIfGitLabProjectExists(organizationSelected, accessToken string) (bool, error) {
-
+func CheckIfGitLabProjectExistsAndFetch(organizationSelected, accessToken, localRepoPath string) (bool, error) {
 	urlToCheck := gitRepoAPIURL + gitGroupName + "%2F" + organizationSelected
-	fmt.Print("\nChecking this project to see if it exists: " + urlToCheck)
+	cloneURL := fmt.Sprintf("https://insidelabs-git.mathworks.com/%s/%s.git", gitGroupName, organizationSelected) // Adjust as necessary
+
+	fmt.Println("\nChecking this project to see if it exists: " + urlToCheck)
 
 	// Create a new request
 	req, err := http.NewRequest("GET", urlToCheck, nil)
@@ -1004,16 +1010,69 @@ func CheckIfGitLabProjectExists(organizationSelected, accessToken string) (bool,
 
 	// A 200 status code means the project exists.
 	if resp.StatusCode == 200 {
+		fmt.Println("Project exists.")
+
+		// Check if localRepoPath exists
+		if _, err := os.Stat(localRepoPath); os.IsNotExist(err) {
+			fmt.Println("Local repository path does not exist. Cloning repository...")
+
+			// Clone the repository.
+			_, err := git.PlainClone(localRepoPath, false, &git.CloneOptions{
+				URL:      cloneURL,
+				Progress: os.Stdout, // Show progress
+				Auth: &githttp.BasicAuth{
+					Username: gitUsername,
+					Password: accessToken,
+				},
+			})
+			if err != nil {
+				return true, fmt.Errorf("failed to clone repository: %w", err)
+			}
+			fmt.Println("Repository cloned.")
+		} else {
+
+			// If the directory exists, attempt to open the repository.
+			r, err := git.PlainOpen(localRepoPath)
+			if err != nil {
+				return true, fmt.Errorf("failed to open local repository: %w", err)
+			}
+
+			// Fetch updates from the remote repository.
+			err = fetchUpdates(r)
+			if err != nil {
+				return true, fmt.Errorf("failed to fetch updates: %w", err)
+			}
+		}
+
 		return true, nil
 	}
 
-	// For other status codes, read the response body and return it as an error.
+	// Assume other status codes are errors and treat them as so.
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false, err
 	}
 
 	return false, fmt.Errorf("GitLab API returned status %d: %s", resp.StatusCode, string(body))
+}
+
+func fetchUpdates(r *git.Repository) error {
+	fmt.Print("\nFetching updates...")
+
+	// Get the working directory for the repository.
+	w, err := r.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	// Fetch the latest changes from the remote repository.
+	err = w.Pull(&git.PullOptions{RemoteName: "origin"})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return fmt.Errorf("failed to fetch updates: %w", err)
+	}
+
+	fmt.Print("\nFetch completed.")
+	return nil
 }
 
 func createLocalGitRepo(folderPath string) error {
@@ -1035,7 +1094,7 @@ func createLocalGitRepo(folderPath string) error {
 		return err
 	}
 
-	// Check if there are any changes staged
+	// Check if there are any changes staged.
 	status, err := w.Status()
 	if err != nil {
 		return err
@@ -1148,8 +1207,8 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 		return nil
 	}
 
-	// Commit the changes
-	_, err = w.Commit("Added R2024a scripts.", &git.CommitOptions{
+	// Commit the changes.
+	_, err = w.Commit(gitExistingRepoCommitMessage, &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  gitUsername,
 			Email: gitEmailAddress,
