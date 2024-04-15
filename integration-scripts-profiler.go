@@ -54,7 +54,7 @@ var (
 	gitGroupName                 string
 	gitUsername                  string
 	gitEmailAddress              string
-	needToCreateGitRepo          bool
+	needToCreateRemoteGitRepo    bool
 	organizationPath             string
 	organizationAbbreviation     string
 )
@@ -394,10 +394,10 @@ func main() {
 
 	if exists {
 		// I've probably printed enough messages about the repo existing at this point, so I won't anymore.
-		needToCreateGitRepo = false
+		needToCreateRemoteGitRepo = false
 	} else {
 		fmt.Print("\nThe project does not exist.")
-		needToCreateGitRepo = true
+		needToCreateRemoteGitRepo = true
 	}
 
 	// # Add some code that'll check to see if the abbreviation has already been set in the remote git repo.
@@ -429,30 +429,35 @@ func main() {
 
 		// List existing contacts and setup auto-completion.
 		var contactFolders []string
-		if gitRepoPath != "" {
-			if _, err := os.Stat(organizationPath); !os.IsNotExist(err) {
-				files, err := os.ReadDir(organizationPath)
-				if err != nil {
-					fmt.Print(redText("\nError reading directory: ", err))
-				} else {
-					fmt.Print("\n\nExisting contacts found:\n\n") // # Add some code to not list anything if no contacts are found.
-					for _, f := range files {
 
-						// We don't want your .git folders listed, thanks.
-						if strings.HasPrefix(f.Name(), ".") {
-							continue
-						}
+		if _, err := os.Stat(organizationPath); !os.IsNotExist(err) {
+			files, err := os.ReadDir(organizationPath)
+			if err != nil {
+				fmt.Print(redText("\nError reading directory: ", err))
+			} else {
+				for _, f := range files {
 
-						if f.IsDir() {
-							contactFolders = append(contactFolders, f.Name())
-							fmt.Println("-", f.Name())
-						}
+					// We don't want your .git folders listed, thanks.
+					if strings.HasPrefix(f.Name(), ".") {
+						continue
+					}
+
+					if f.IsDir() {
+						contactFolders = append(contactFolders, f.Name())
+					}
+				}
+
+				// Only display the existing contacts message if there are valid folders found.
+				if len(contactFolders) > 0 {
+					fmt.Print("\n\nExisting contacts found:\n\n")
+					for _, folderName := range contactFolders {
+						fmt.Println("-", folderName)
 					}
 				}
 			}
 		}
 
-		// Setup auto-completer.
+		// Setup auto-completer with the valid folders found.
 		completer := &FolderCompleter{Folders: contactFolders}
 		rl.Config.AutoComplete = completer
 
@@ -482,6 +487,7 @@ func main() {
 			}
 		}
 	}
+
 	if useCaseNumber {
 		for {
 			fmt.Print("Enter the Salesforce Case Number associated with these scripts. Press Enter to skip.\n")
@@ -861,6 +867,7 @@ func main() {
 	file, err := os.Create(testFilePath)
 	if err != nil {
 		fmt.Print(redText("\nError creating file: ", err))
+		os.Exit(1)
 		return
 	}
 	defer file.Close()
@@ -877,6 +884,7 @@ func main() {
 		}
 	} else if err != nil {
 		fmt.Print(redText("\nError checking if .git directory exists: ", err))
+		os.Exit(1)
 		return
 	} else {
 		// The .git directory exists, no action needed
@@ -884,10 +892,11 @@ func main() {
 	}
 
 	// Create the repo on GitLab, if needed.
-	if needToCreateGitRepo {
+	if needToCreateRemoteGitRepo {
 		projectURL, err := createGitLabRepo(organizationSelected, accessToken, gitRepoAPIURL, gitGroupID)
 		if err != nil {
 			fmt.Print(redText("\nError creating GitLab project: ", err))
+			os.Exit(1)
 			return
 		}
 		fmt.Print("\nGitLab project created: ", projectURL)
@@ -896,7 +905,16 @@ func main() {
 	// Commit the changes made and push them to the remote repo.
 	if err := commitAndPush(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
 		fmt.Print(redText("\nError committing or pushing: ", err))
+		os.Exit(1)
 		return
+	}
+
+	if needToCreateRemoteGitRepo {
+		if err := publishMainBranch(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
+			fmt.Print(redText("\nError publishing main branch: ", err))
+			os.Exit(1)
+			return
+		}
 	}
 
 	fmt.Print("\nPushed to GitLab successfully.")
@@ -1219,7 +1237,7 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 		return err
 	}
 
-	// Push the changes to the remote
+	// Push the changes to the remote.
 	err = r.Push(&git.PushOptions{
 		RemoteName: "origin",
 		Auth: &githttp.BasicAuth{
@@ -1229,6 +1247,51 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 	})
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func publishMainBranch(folderPath, projectName, gitUsername, accessToken string) error {
+	constructedURL := fmt.Sprintf("https://insidelabs-git.mathworks.com/%s/%s.git", gitGroupName, projectName)
+	fmt.Printf("\nPreparing to publish 'main' branch to: %s\n", constructedURL)
+
+	// Open the existing repo.
+	r, err := git.PlainOpen(folderPath)
+	if err != nil {
+		return fmt.Errorf("failed to open local repository: %v", err)
+	}
+
+	// Ensure the remote is correctly set up.
+	_, err = r.Remote("origin")
+	if err != nil {
+		// Remote branch "origin" somehow does not already exist, so let's create it!
+		_, err = r.CreateRemote(&config.RemoteConfig{
+			Name: "origin",
+			URLs: []string{constructedURL},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create remote 'origin': %v", err)
+		}
+	}
+
+	// Push 'main' branch to remote 'origin', setting it as upstream.
+	err = r.Push(&git.PushOptions{
+		RemoteName: "origin",
+		RefSpecs:   []config.RefSpec{"refs/heads/main:refs/heads/main"},
+		Auth: &githttp.BasicAuth{
+			Username: gitUsername,
+			Password: accessToken,
+		},
+	})
+	if err != nil {
+		if err == git.NoErrAlreadyUpToDate {
+			fmt.Println("The 'main' branch is already up to date with the remote.")
+		} else {
+			return fmt.Errorf("failed to push 'main' branch to remote: %v", err)
+		}
+	} else {
+		fmt.Println("Successfully published 'main' branch to remote repository.")
 	}
 
 	return nil
