@@ -312,7 +312,7 @@ func main() {
 				err := os.RemoveAll(unzipPath)
 				if err != nil {
 					fmt.Print(redText("\nFailed to delete the existing integration scripts directory: ", err))
-					continue
+					os.Exit(1)
 				}
 			}
 
@@ -338,6 +338,7 @@ func main() {
 			files, err := os.ReadDir(customerEngagementsPath)
 			if err != nil {
 				fmt.Print(redText("\nError reading directory: ", err))
+				os.Exit(1)
 			} else {
 				fmt.Print("\n\nExisting engagements found:\n\n")
 				for _, f := range files {
@@ -389,7 +390,7 @@ func main() {
 	exists, err := CheckIfGitLabProjectExistsAndFetch(organizationSelected, accessToken, organizationPath)
 	if err != nil {
 		fmt.Print(redText("\nError checking project existence: ", err))
-		return
+		os.Exit(1)
 	}
 
 	if exists {
@@ -400,28 +401,29 @@ func main() {
 		needToCreateRemoteGitRepo = true
 	}
 
-	// # Add some code that'll check to see if the abbreviation has already been set in the remote git repo.
-	for {
-		fmt.Print("\nEnter the organization's abrreviation. If it's unknown, leave it empty.\n")
-		organizationAbbreviation, err = rl.Readline()
-		if err != nil {
-			if err.Error() == "Interrupt" {
-				fmt.Print(redText("\nExiting from user input."))
-			} else {
-				fmt.Print(redText("\nError reading line: ", err))
-				continue
+	if needToCreateRemoteGitRepo {
+		for {
+			fmt.Print("\nEnter the organization's abrreviation. If it's unknown, leave it empty.\n")
+			organizationAbbreviation, err = rl.Readline()
+			if err != nil {
+				if err.Error() == "Interrupt" {
+					fmt.Print(redText("\nExiting from user input."))
+				} else {
+					fmt.Print(redText("\nError reading line: ", err))
+					continue
+				}
+				return
 			}
-			return
-		}
-		organizationAbbreviation = strings.TrimSpace(organizationAbbreviation)
+			organizationAbbreviation = strings.TrimSpace(organizationAbbreviation)
 
-		if organizationAbbreviation == "" {
-			break
-		} else if lettersPattern.MatchString(organizationAbbreviation) && organizationAbbreviation != "" {
-			fmt.Print(redText("\nInvalid input. You may only use letters in the abbreviation and at least 1 letter is required.\n"))
-			continue
-		} else {
-			break
+			if organizationAbbreviation == "" {
+				break
+			} else if lettersPattern.MatchString(organizationAbbreviation) && organizationAbbreviation != "" {
+				fmt.Print(redText("\nInvalid input. You may only use letters in the abbreviation and at least 1 letter is required.\n"))
+				continue
+			} else {
+				break
+			}
 		}
 	}
 
@@ -434,6 +436,7 @@ func main() {
 			files, err := os.ReadDir(organizationPath)
 			if err != nil {
 				fmt.Print(redText("\nError reading directory: ", err))
+				os.Exit(1)
 			} else {
 				for _, f := range files {
 
@@ -888,7 +891,7 @@ func main() {
 		return
 	} else {
 		// The .git directory exists, no action needed
-		fmt.Println(".git directory already exists.")
+		fmt.Println("\n.git directory already exists.")
 	}
 
 	// Create the repo on GitLab, if needed.
@@ -1000,8 +1003,20 @@ func ensureDir(path string) error {
 }
 
 func CheckIfGitLabProjectExistsAndFetch(organizationSelected, accessToken, localRepoPath string) (bool, error) {
+
+	redText := color.New(color.FgRed).SprintFunc()
 	urlToCheck := gitRepoAPIURL + gitGroupName + "%2F" + organizationSelected
-	cloneURL := fmt.Sprintf("https://insidelabs-git.mathworks.com/%s/%s.git", gitGroupName, organizationSelected) // Adjust as necessary
+
+	// Need to remove everything after .com/ in your API URL for the cloneURL.
+	parts := strings.Split(gitRepoAPIURL, ".com")
+	baseURL := ""
+	if len(parts) > 0 {
+		baseURL = parts[0] + ".com"
+	} else {
+		return false, fmt.Errorf("'.com' not found in your gitRepoAPIURL")
+	}
+
+	cloneURL := fmt.Sprintf("%s/%s/%s.git", baseURL, gitGroupName, organizationSelected)
 
 	fmt.Println("\nChecking this project to see if it exists: " + urlToCheck)
 
@@ -1058,7 +1073,8 @@ func CheckIfGitLabProjectExistsAndFetch(organizationSelected, accessToken, local
 			// Fetch updates from the remote repository.
 			err = fetchUpdates(r)
 			if err != nil {
-				return true, fmt.Errorf("failed to fetch updates: %w", err)
+				fmt.Print(redText("\nFailed to fetch updates: ", err))
+				os.Exit(1)
 			}
 		}
 
@@ -1075,18 +1091,31 @@ func CheckIfGitLabProjectExistsAndFetch(organizationSelected, accessToken, local
 }
 
 func fetchUpdates(r *git.Repository) error {
+
+	// Sometimes shit is hard.
+	redText := color.New(color.FgRed).SprintFunc()
+
 	fmt.Print("\nFetching updates...")
 
-	// Get the working directory for the repository.
-	w, err := r.Worktree()
+	// Get the remote configuration
+	remote, err := r.Remote("origin")
 	if err != nil {
-		return fmt.Errorf("failed to get worktree: %w", err)
+		fmt.Print(redText("\nFailed to get remote origin: ", err))
+		os.Exit(1)
 	}
 
-	// Fetch the latest changes from the remote repository.
-	err = w.Pull(&git.PullOptions{RemoteName: "origin"})
+	// Fetch the latest changes from the remote repository with authentication
+	err = remote.Fetch(&git.FetchOptions{
+		Auth: &githttp.BasicAuth{
+			Username: gitUsername,
+			Password: accessToken,
+		},
+		RefSpecs: []config.RefSpec{"refs/*:refs/*"},
+		Force:    true,
+	})
+
 	if err != nil && err != git.NoErrAlreadyUpToDate {
-		return fmt.Errorf("failed to fetch updates: %w", err)
+		fmt.Print(redText("\nFailed to fetch updates: ", err))
 	}
 
 	fmt.Print("\nFetch completed.")
@@ -1183,7 +1212,18 @@ func createGitLabRepo(projectName, accessToken, gitRepoAPIURL string, namespaceI
 }
 
 func commitAndPush(folderPath, projectName, gitUsername, accessToken string) error {
-	constructedURL := fmt.Sprintf("https://insidelabs-git.mathworks.com/%s/%s.git", gitGroupName, projectName)
+
+	// Need to remove everything after .com in your API URL for the constructedURL.
+	parts := strings.Split(gitRepoAPIURL, ".com")
+	baseURL := ""
+	if len(parts) > 0 {
+		baseURL = parts[0] + ".com"
+	} else {
+		return fmt.Errorf("'.com' not found in your gitRepoAPIURL")
+	}
+
+	constructedURL := fmt.Sprintf("%s/%s/%s.git", baseURL, gitGroupName, projectName)
+
 	fmt.Printf("\nProject URL to commit to: %s", constructedURL)
 
 	r, err := git.PlainOpen(folderPath)
@@ -1253,7 +1293,17 @@ func commitAndPush(folderPath, projectName, gitUsername, accessToken string) err
 }
 
 func publishMainBranch(folderPath, projectName, gitUsername, accessToken string) error {
-	constructedURL := fmt.Sprintf("https://insidelabs-git.mathworks.com/%s/%s.git", gitGroupName, projectName)
+
+	// Need to remove everything after .com/ in your API URL for the constructedURL.
+	parts := strings.Split(gitRepoAPIURL, ".com")
+	baseURL := ""
+	if len(parts) > 0 {
+		baseURL = parts[0] + ".com"
+	} else {
+		return fmt.Errorf("'.com' not found in your gitRepoAPIURL")
+	}
+
+	constructedURL := fmt.Sprintf("%s/%s/%s.git", baseURL, gitGroupName, projectName)
 	fmt.Printf("\nPreparing to publish 'main' branch to: %s\n", constructedURL)
 
 	// Open the existing repo.
