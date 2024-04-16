@@ -3,6 +3,7 @@ downloadScriptsOnLaunch = true
 #scriptsPath = "C:\Users\toaja\Downloads\"
 accessToken = abc123
 gitEmailAddress = nobody@email.com
+gitExistingRepoCommitMessage = Added R2024a scripts.
 gitGroupID = 123456
 gitGroupName = jestzer-test-projects
 gitRepoPath = C:\Gitlab
