@@ -786,7 +786,7 @@ func main() {
 				if strings.Contains(clusterMatlabRoot, "/") || strings.Contains(clusterMatlabRoot, "\\") {
 					break
 				} else {
-					fmt.Print(redText("\nInvalid filepath. "))
+					fmt.Print(redText("Invalid filepath.\n"))
 					continue
 				}
 			}
@@ -890,7 +890,6 @@ func main() {
 		os.Exit(1)
 		return
 	} else {
-		// The .git directory exists, no action needed
 		fmt.Println("\n.git directory already exists.")
 	}
 
@@ -903,13 +902,12 @@ func main() {
 			return
 		}
 		fmt.Print("\nGitLab project created: ", projectURL)
-	}
-
-	// Commit the changes made and push them to the remote repo.
-	if err := commitAndPush(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
-		fmt.Print(redText("\nError committing or pushing: ", err))
-		os.Exit(1)
-		return
+	} else { // Commit the changes made and push them to the remote repo.
+		if err := remoteCommitAndPush(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
+			fmt.Print(redText("\nError committing or pushing: ", err))
+			os.Exit(1)
+			return
+		}
 	}
 
 	if needToCreateRemoteGitRepo {
@@ -1211,7 +1209,7 @@ func createGitLabRepo(projectName, accessToken, gitRepoAPIURL string, namespaceI
 	return project.WebURL, nil
 }
 
-func commitAndPush(folderPath, projectName, gitUsername, accessToken string) error {
+func remoteCommitAndPush(folderPath, projectName, gitUsername, accessToken string) error {
 
 	// Need to remove everything after .com in your API URL for the constructedURL.
 	parts := strings.Split(gitRepoAPIURL, ".com")
