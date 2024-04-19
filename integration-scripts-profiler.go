@@ -374,6 +374,7 @@ func main() {
 			return
 		}
 		organizationSelected = strings.TrimSpace(organizationSelected)
+		organizationSelected = strings.ReplaceAll(organizationSelected, " ", "-")
 
 		if organizationSelected == "" {
 			fmt.Print(redText("Invalid entry. "))
@@ -478,6 +479,7 @@ func main() {
 			}
 
 			organizationContact = strings.TrimSpace(organizationContact)
+			organizationContact = strings.ReplaceAll(organizationContact, " ", "-")
 
 			if organizationContact == "" {
 				organizationContact = "first-last"
@@ -741,6 +743,7 @@ func main() {
 				continue
 			}
 		}
+
 		if submissionType == "desktop" || submissionType == "both" {
 			for {
 				fmt.Print("Does the client have a shared filesystem with the cluster? (y/n)\n")
@@ -840,15 +843,51 @@ func main() {
 		}
 		fmt.Print("\nCreating integration scripts for cluster #", i, "...\n")
 
-		// Create the organization's directory, if it's not already in existence.
-		err := ensureDir(organizationPath)
-		if err != nil {
-			fmt.Printf("\nError creating directory: %s", err)
-		} else {
-			fmt.Print("\nOrganization directory created!")
+		// This is where Big Things Part 1(tm) will happen.
+
+		// Let's assume you aren't massively screwing with things. We should only need to do these things once.
+		if i == 1 {
+			// Create the necessary directories, if they don't already exist.
+			err := ensureDir(organizationPath)
+			if err != nil {
+				msg := fmt.Sprintf("\nError creating directory: %s", err)
+				fmt.Print(redText(msg))
+				os.Exit(1)
+			}
+
+			organizationContactPath := filepath.Join(organizationPath, organizationContact)
+			err = ensureDir(organizationContactPath)
+			if err != nil {
+				msg := fmt.Sprintf("\nError creating directory: %s", err)
+				fmt.Print(redText(msg))
+				os.Exit(1)
+			}
+
+			docPath := filepath.Join(organizationContact, "doc")
+			err = ensureDir(docPath)
+			if err != nil {
+				msg := fmt.Sprintf("\nError creating directory: %s", err)
+				fmt.Print(redText(msg))
+				os.Exit(1)
+			}
+
+			pubPath := filepath.Join(organizationContact, "pub")
+			err = ensureDir(pubPath)
+			if err != nil {
+				msg := fmt.Sprintf("\nError creating directory: %s", err)
+				fmt.Print(redText(msg))
+				os.Exit(1)
+			}
+
+			scriptsPath := filepath.Join(organizationContact, "scripts")
+			err = ensureDir(scriptsPath)
+			if err != nil {
+				msg := fmt.Sprintf("\nError creating directory: %s", err)
+				fmt.Print(redText(msg))
+				os.Exit(1)
+			}
 		}
 
-		// This is where Big Things Part 1(tm) will happen.
 		// These are just here for now to make Go shut the hell up.
 		if useCaseNumber {
 			fmt.Print("\nCase number: ", caseNumber)
