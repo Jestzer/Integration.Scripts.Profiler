@@ -57,6 +57,7 @@ var (
 	needToCreateRemoteGitRepo    bool
 	organizationPath             string
 	organizationAbbreviation     string
+	releaseNumber                string
 )
 
 func main() {
@@ -264,6 +265,12 @@ func main() {
 						gitEmailAddress = strings.TrimSpace(gitEmailAddress)
 						gitEmailAddress = strings.Trim(gitEmailAddress, "\"")
 						fmt.Print("\nYour Git repo email address has been set to ", gitEmailAddress)
+					} else if strings.HasPrefix(line, "releaseNumber =") || strings.HasPrefix(line, "releaseNumber=") {
+						releaseNumber = strings.TrimPrefix(line, "releaseNumber =")
+						releaseNumber = strings.TrimPrefix(releaseNumber, "releaseNumber=")
+						releaseNumber = strings.TrimSpace(releaseNumber)
+						releaseNumber = strings.Trim(releaseNumber, "\"")
+						fmt.Print("\nThe release number has been set to ", releaseNumber)
 					} else if strings.HasPrefix(strings.ToLower(line), "usecasenumber") {
 						if strings.Contains(strings.ToLower(line), "false") {
 							useCaseNumber = false
@@ -886,6 +893,39 @@ func main() {
 				fmt.Print(redText(msg))
 				os.Exit(1)
 			}
+
+			schedulerPath := filepath.Join(scriptsPath, schedulerSelected)
+			err = ensureDir(schedulerPath)
+			if err != nil {
+				msg := fmt.Sprintf("\nError creating directory: %s", err)
+				fmt.Print(redText(msg))
+				os.Exit(1)
+			}
+
+			releaseNumberPath := filepath.Join(schedulerPath, releaseNumber)
+			err = ensureDir(releaseNumberPath)
+			if err != nil {
+				msg := fmt.Sprintf("\nError creating directory: %s", err)
+				fmt.Print(redText(msg))
+				os.Exit(1)
+			}
+
+			binPath := filepath.Join(releaseNumberPath, "bin") // Path to ppBinPath = C:\Gitlab\Utilities\config-scripts\schedulerSelected\bin
+			err = ensureDir(binPath)
+			if err != nil {
+				msg := fmt.Sprintf("\nError creating directory: %s", err)
+				fmt.Print(redText(msg))
+				os.Exit(1)
+			}
+
+			matlabPath := filepath.Join(releaseNumberPath, "matlab")
+			err = ensureDir(matlabPath)
+			if err != nil {
+				msg := fmt.Sprintf("\nError creating directory: %s", err)
+				fmt.Print(redText(msg))
+				os.Exit(1)
+			}
+
 		}
 
 		// These are just here for now to make Go shut the hell up.

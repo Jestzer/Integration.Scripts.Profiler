@@ -9,4 +9,5 @@ gitGroupName = jestzer-test-projects
 gitRepoPath = C:\Gitlab
 gitRepoAPIURL = https://gitlab.com/api/v4/projects/
 gitUsername = Jestzer
-useCaseNumber = true
+releaseNumber = R2024a
+team = parallel
