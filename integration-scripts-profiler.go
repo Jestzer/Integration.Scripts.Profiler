@@ -58,6 +58,7 @@ var (
 	organizationPath             string
 	organizationAbbreviation     string
 	releaseNumber                string
+	team                         string
 )
 
 func main() {
@@ -76,7 +77,6 @@ func main() {
 	var input string
 	var scriptsPath string
 	var downloadScriptsOnLanuch bool = true
-	var useCaseNumber bool = true
 	var caseNumber int
 	var gitRepoPath string
 	var schedulerSelected string
@@ -271,13 +271,17 @@ func main() {
 						releaseNumber = strings.TrimSpace(releaseNumber)
 						releaseNumber = strings.Trim(releaseNumber, "\"")
 						fmt.Print("\nThe release number has been set to ", releaseNumber)
-					} else if strings.HasPrefix(strings.ToLower(line), "usecasenumber") {
-						if strings.Contains(strings.ToLower(line), "false") {
-							useCaseNumber = false
-							fmt.Print("\nPer your settings, you will not be prompted to fill in a Case Number.")
+					} else if strings.HasPrefix(strings.ToLower(line), "team") {
+						if strings.Contains(strings.ToLower(line), "install") {
+							team = "install"
+							fmt.Print("\nYour team has been set to Install.")
+						} else {
+							team = "parallel"
+							fmt.Print("\nYour team has been set to Parallel Pilot.")
 						}
 					} else {
 						fmt.Print(redText("\nUnrecognized setting detected. The line in question has this content: ", line))
+						os.Exit(1)
 					}
 				}
 			}
@@ -500,7 +504,7 @@ func main() {
 		}
 	}
 
-	if useCaseNumber {
+	if team == "install" {
 		for {
 			fmt.Print("Enter the Salesforce Case Number associated with these scripts. Press Enter to skip.\n")
 			input, err = rl.Readline()
@@ -517,7 +521,6 @@ func main() {
 
 			// Don't accept anything other than numbers and blank input.
 			if input == "" {
-				useCaseNumber = false
 				break
 			} else if _, err := strconv.Atoi(input); err == nil && input != "" { // # Add som code to do something with the potential error message.
 				caseNumber, _ = strconv.Atoi(input)
@@ -851,6 +854,16 @@ func main() {
 		fmt.Print("\nCreating integration scripts for cluster #", i, "...\n")
 
 		// This is where Big Things Part 1(tm) will happen.
+		// These will be used in and out of if statements, so let's setup them up now.
+		organizationContactPath := filepath.Join(organizationPath, organizationContact)
+		docPath := filepath.Join(organizationContact, "doc")
+		pubPath := filepath.Join(organizationContact, "pub")
+		scriptsPath := filepath.Join(organizationContact, "scripts")
+		schedulerPath := filepath.Join(scriptsPath, schedulerSelected)
+		releaseNumberPath := filepath.Join(schedulerPath, releaseNumber)
+		binPath := filepath.Join(releaseNumberPath, "bin") // Path to ppBinPath = C:\Gitlab\Utilities\config-scripts\schedulerSelected\bin
+		matlabPath := filepath.Join(releaseNumberPath, "matlab")
+		IntegrationScriptsPath := filepath.Join(matlabPath, "IntegrationScripts")
 
 		// Let's assume you aren't massively screwing with things. We should only need to do these things once.
 		if i == 1 {
@@ -862,7 +875,6 @@ func main() {
 				os.Exit(1)
 			}
 
-			organizationContactPath := filepath.Join(organizationPath, organizationContact)
 			err = ensureDir(organizationContactPath)
 			if err != nil {
 				msg := fmt.Sprintf("\nError creating directory: %s", err)
@@ -870,7 +882,6 @@ func main() {
 				os.Exit(1)
 			}
 
-			docPath := filepath.Join(organizationContact, "doc")
 			err = ensureDir(docPath)
 			if err != nil {
 				msg := fmt.Sprintf("\nError creating directory: %s", err)
@@ -878,7 +889,6 @@ func main() {
 				os.Exit(1)
 			}
 
-			pubPath := filepath.Join(organizationContact, "pub")
 			err = ensureDir(pubPath)
 			if err != nil {
 				msg := fmt.Sprintf("\nError creating directory: %s", err)
@@ -886,7 +896,6 @@ func main() {
 				os.Exit(1)
 			}
 
-			scriptsPath := filepath.Join(organizationContact, "scripts")
 			err = ensureDir(scriptsPath)
 			if err != nil {
 				msg := fmt.Sprintf("\nError creating directory: %s", err)
@@ -894,7 +903,6 @@ func main() {
 				os.Exit(1)
 			}
 
-			schedulerPath := filepath.Join(scriptsPath, schedulerSelected)
 			err = ensureDir(schedulerPath)
 			if err != nil {
 				msg := fmt.Sprintf("\nError creating directory: %s", err)
@@ -902,7 +910,6 @@ func main() {
 				os.Exit(1)
 			}
 
-			releaseNumberPath := filepath.Join(schedulerPath, releaseNumber)
 			err = ensureDir(releaseNumberPath)
 			if err != nil {
 				msg := fmt.Sprintf("\nError creating directory: %s", err)
@@ -910,7 +917,6 @@ func main() {
 				os.Exit(1)
 			}
 
-			binPath := filepath.Join(releaseNumberPath, "bin") // Path to ppBinPath = C:\Gitlab\Utilities\config-scripts\schedulerSelected\bin
 			err = ensureDir(binPath)
 			if err != nil {
 				msg := fmt.Sprintf("\nError creating directory: %s", err)
@@ -918,7 +924,6 @@ func main() {
 				os.Exit(1)
 			}
 
-			matlabPath := filepath.Join(releaseNumberPath, "matlab")
 			err = ensureDir(matlabPath)
 			if err != nil {
 				msg := fmt.Sprintf("\nError creating directory: %s", err)
@@ -926,12 +931,24 @@ func main() {
 				os.Exit(1)
 			}
 
+			err = ensureDir(IntegrationScriptsPath)
+			if err != nil {
+				msg := fmt.Sprintf("\nError creating directory: %s", err)
+				fmt.Print(redText(msg))
+				os.Exit(1)
+			}
+		}
+
+		// Back to make cluster i's stuff!
+		clusterNamePath := filepath.Join(IntegrationScriptsPath, clusterName)
+		err = ensureDir(IntegrationScriptsPath)
+		if err != nil {
+			msg := fmt.Sprintf("\nError creating directory: %s", err)
+			fmt.Print(redText(msg))
+			os.Exit(1)
 		}
 
 		// These are just here for now to make Go shut the hell up.
-		if useCaseNumber {
-			fmt.Print("\nCase number: ", caseNumber)
-		}
 		if customMPI {
 			fmt.Print("\nyou did it. custom mpi. yipee.")
 		}
