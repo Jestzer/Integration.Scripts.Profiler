@@ -30,6 +30,14 @@ type FolderCompleter struct {
 	Folders []string
 }
 
+// Used for copying files later on.
+type fileCopyTask struct {
+	relativeSourcePath  string
+	destinationFileName string
+	destinationBasePath string
+	isDirectory         bool
+}
+
 // This function needs to be placed before the main function IIRC.
 func (f *FolderCompleter) Do(line []rune, pos int) (newLine [][]rune, length int) {
 	prefix := string(line[:pos]) // Ensure we're only considering the part of the line up to the cursor.
@@ -867,81 +875,50 @@ func main() {
 
 		// Let's assume you aren't massively screwing with things. We should only need to do these things once.
 		if i == 1 {
+
 			// Create the necessary directories, if they don't already exist.
-			err := ensureDir(organizationPath)
-			if err != nil {
-				msg := fmt.Sprintf("\nError creating directory: %s", err)
-				fmt.Print(redText(msg))
-				os.Exit(1)
+			newEngagementPaths := []string{organizationPath, organizationContactPath, docPath, pubPath, scriptsPath, schedulerPath, releaseNumberPath, binPath, matlabPath, IntegrationScriptsPath}
+
+			// Iterate over each path.
+			for _, path := range newEngagementPaths {
+				err := ensureDir(path)
+				if err != nil {
+					msg := fmt.Sprintf("\nError creating directory: %s", err)
+					fmt.Print(redText(msg))
+					os.Exit(1)
+				}
 			}
 
-			err = ensureDir(organizationContactPath)
-			if err != nil {
-				msg := fmt.Sprintf("\nError creating directory: %s", err)
-				fmt.Print(redText(msg))
-				os.Exit(1)
+			// Copy new engagement files.
+			tasks := []fileCopyTask{
+				{relativeSourcePath: filepath.Join("Utilities", "doc", "Getting_Started_With_Serial_And_Parallel_MATLAB.docx"), destinationFileName: "Getting_Started_With_Serial_And_Parallel_MATLAB.docx", destinationBasePath: docPath},
+				{relativeSourcePath: filepath.Join("Utilities", "doc", "README.txt"), destinationFileName: "README.txt", destinationBasePath: docPath},
+				{relativeSourcePath: filepath.Join("Utilities", "pub"), destinationFileName: "", destinationBasePath: pubPath, isDirectory: true},
 			}
 
-			err = ensureDir(docPath)
-			if err != nil {
-				msg := fmt.Sprintf("\nError creating directory: %s", err)
-				fmt.Print(redText(msg))
-				os.Exit(1)
-			}
+			for _, task := range tasks {
+				sourceFilePath := filepath.Join(gitRepoPath, task.relativeSourcePath)
+				destFilePath := filepath.Join(task.destinationBasePath, task.destinationFileName)
 
-			err = ensureDir(pubPath)
-			if err != nil {
-				msg := fmt.Sprintf("\nError creating directory: %s", err)
-				fmt.Print(redText(msg))
-				os.Exit(1)
-			}
-
-			err = ensureDir(scriptsPath)
-			if err != nil {
-				msg := fmt.Sprintf("\nError creating directory: %s", err)
-				fmt.Print(redText(msg))
-				os.Exit(1)
-			}
-
-			err = ensureDir(schedulerPath)
-			if err != nil {
-				msg := fmt.Sprintf("\nError creating directory: %s", err)
-				fmt.Print(redText(msg))
-				os.Exit(1)
-			}
-
-			err = ensureDir(releaseNumberPath)
-			if err != nil {
-				msg := fmt.Sprintf("\nError creating directory: %s", err)
-				fmt.Print(redText(msg))
-				os.Exit(1)
-			}
-
-			err = ensureDir(binPath)
-			if err != nil {
-				msg := fmt.Sprintf("\nError creating directory: %s", err)
-				fmt.Print(redText(msg))
-				os.Exit(1)
-			}
-
-			err = ensureDir(matlabPath)
-			if err != nil {
-				msg := fmt.Sprintf("\nError creating directory: %s", err)
-				fmt.Print(redText(msg))
-				os.Exit(1)
-			}
-
-			err = ensureDir(IntegrationScriptsPath)
-			if err != nil {
-				msg := fmt.Sprintf("\nError creating directory: %s", err)
-				fmt.Print(redText(msg))
-				os.Exit(1)
+				if task.isDirectory {
+					err := copyDirectory(sourceFilePath, destFilePath)
+					if err != nil {
+						fmt.Print(redText("\nFailed to copy the directory:", err))
+						os.Exit(1)
+					}
+				} else {
+					err := copyFile(sourceFilePath, destFilePath)
+					if err != nil {
+						fmt.Print(redText("\nFailed to copy the file:", err))
+						os.Exit(1)
+					}
+				}
 			}
 		}
 
 		// Back to make cluster i's stuff!
 		clusterNamePath := filepath.Join(IntegrationScriptsPath, clusterName)
-		err = ensureDir(IntegrationScriptsPath)
+		err = ensureDir(clusterNamePath)
 		if err != nil {
 			msg := fmt.Sprintf("\nError creating directory: %s", err)
 			fmt.Print(redText(msg))
@@ -1093,6 +1070,67 @@ func ensureDir(path string) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func copyFile(src, dst string) error {
+
+	// Open the source file for reading.
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	// Create the destination file for writing.
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	// Copy the contents of the source file to the destination file.
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	// Ensure that any writes to the destination file are committed.
+	err = destFile.Sync()
+	return err
+}
+
+func copyDirectory(srcDir, destDir string) error {
+	// Create the destination directory, if we haven't already.
+	err := os.MkdirAll(destDir, 0755)
+	if err != nil {
+		return err
+	}
+
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(srcDir, entry.Name())
+		destPath := filepath.Join(destDir, entry.Name())
+
+		if entry.IsDir() {
+			// Recursively copy subdirectories.
+			err = copyDirectory(srcPath, destPath)
+			if err != nil {
+				return err
+			}
+		} else {
+			// Copy files.
+			err = copyFile(srcPath, destPath)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
