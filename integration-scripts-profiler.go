@@ -32,7 +32,7 @@ type FolderCompleter struct {
 
 // Used for copying files later on.
 type fileCopyTask struct {
-	relativeSourcePath  string
+	sourceFile          string
 	destinationFileName string
 	destinationBasePath string
 	isDirectory         bool
@@ -67,6 +67,7 @@ var (
 	organizationAbbreviation     string
 	releaseNumber                string
 	team                         string
+	submitToRemoteRepo           bool
 )
 
 func main() {
@@ -89,6 +90,7 @@ func main() {
 	var gitRepoPath string
 	var schedulerSelected string
 	var organizationContact string
+	var organizationContactPath string
 	var customMPIInput string
 	var customMPI bool
 	var clusterCount int
@@ -283,9 +285,22 @@ func main() {
 						if strings.Contains(strings.ToLower(line), "install") {
 							team = "install"
 							fmt.Print("\nYour team has been set to Install.")
-						} else {
+						} else if strings.Contains(strings.ToLower(line), "parallel") {
 							team = "parallel"
 							fmt.Print("\nYour team has been set to Parallel Pilot.")
+						} else {
+							fmt.Print(redText("\nYou selected a team other than Install or Parallel Pilot team in your settings Please correct this."))
+							os.Exit(1)
+						}
+					} else if strings.HasPrefix(strings.ToLower(line), "submittoremoterepo") {
+						if strings.Contains(strings.ToLower(line), "false") {
+							submitToRemoteRepo = false
+							fmt.Print("\nPer your settings, you will not be sumbitting your work to a remote repo.")
+						} else if strings.Contains(strings.ToLower(line), "true") {
+							submitToRemoteRepo = true
+						} else {
+							fmt.Print(redText("\nYou entered something other than true or false for your submitToRemoteRepo setting. Please correct this."))
+							os.Exit(1)
 						}
 					} else {
 						fmt.Print(redText("\nUnrecognized setting detected. The line in question has this content: ", line))
@@ -406,43 +421,46 @@ func main() {
 	// Now that we know what the organization's name is, define its path.
 	organizationPath = filepath.Join(gitRepoPath, "Customer-Engagements", organizationSelected)
 
-	// And we can check if the remote repo exists! Fetch it now!
-	exists, err := CheckIfGitLabProjectExistsAndFetch(organizationSelected, accessToken, organizationPath)
-	if err != nil {
-		fmt.Print(redText("\nError checking project existence: ", err))
-		os.Exit(1)
-	}
+	if submitToRemoteRepo {
 
-	if exists {
-		// I've probably printed enough messages about the repo existing at this point, so I won't anymore.
-		needToCreateRemoteGitRepo = false
-	} else {
-		fmt.Print("\nThe project does not exist.")
-		needToCreateRemoteGitRepo = true
-	}
+		// And we can check if the remote repo exists! Fetch it now!
+		exists, err := CheckIfGitLabProjectExistsAndFetch(organizationSelected, accessToken, organizationPath)
+		if err != nil {
+			fmt.Print(redText("\nError checking project existence: ", err))
+			os.Exit(1)
+		}
 
-	if needToCreateRemoteGitRepo {
-		for {
-			fmt.Print("\nEnter the organization's abrreviation. If it's unknown, leave it empty.\n")
-			organizationAbbreviation, err = rl.Readline()
-			if err != nil {
-				if err.Error() == "Interrupt" {
-					fmt.Print(redText("\nExiting from user input."))
-				} else {
-					fmt.Print(redText("\nError reading line: ", err))
-					continue
+		if exists {
+			// I've probably printed enough messages about the repo existing at this point, so I won't anymore.
+			needToCreateRemoteGitRepo = false
+		} else {
+			fmt.Print("\nThe project does not exist.")
+			needToCreateRemoteGitRepo = true
+		}
+
+		if needToCreateRemoteGitRepo {
+			for {
+				fmt.Print("\nEnter the organization's abrreviation. If it's unknown, leave it empty.\n")
+				organizationAbbreviation, err = rl.Readline()
+				if err != nil {
+					if err.Error() == "Interrupt" {
+						fmt.Print(redText("\nExiting from user input."))
+					} else {
+						fmt.Print(redText("\nError reading line: ", err))
+						continue
+					}
+					return
 				}
-				return
-			}
-			organizationAbbreviation = strings.TrimSpace(organizationAbbreviation)
+				organizationAbbreviation = strings.TrimSpace(organizationAbbreviation)
 
-			if organizationAbbreviation == "" {
-				break
-			} else if lettersPattern.MatchString(organizationAbbreviation) && organizationAbbreviation != "" {
-				fmt.Print(redText("\nInvalid input. You may only use letters in the abbreviation and at least 1 letter is required.\n"))
-				continue
-			} else {
-				break
+				if organizationAbbreviation == "" {
+					break
+				} else if lettersPattern.MatchString(organizationAbbreviation) && organizationAbbreviation != "" {
+					fmt.Print(redText("\nInvalid input. You may only use letters in the abbreviation and at least 1 letter is required.\n"))
+					continue
+				} else {
+					break
+				}
 			}
 		}
 	}
@@ -863,10 +881,10 @@ func main() {
 
 		// This is where Big Things Part 1(tm) will happen.
 		// These will be used in and out of if statements, so let's setup them up now.
-		organizationContactPath := filepath.Join(organizationPath, organizationContact)
-		docPath := filepath.Join(organizationContact, "doc")
-		pubPath := filepath.Join(organizationContact, "pub")
-		scriptsPath := filepath.Join(organizationContact, "scripts")
+		organizationContactPath = filepath.Join(organizationPath, organizationContact)
+		docPath := filepath.Join(organizationContactPath, "doc")
+		pubPath := filepath.Join(organizationContactPath, "pub")
+		scriptsPath := filepath.Join(organizationContactPath, "scripts")
 		schedulerPath := filepath.Join(scriptsPath, schedulerSelected)
 		releaseNumberPath := filepath.Join(schedulerPath, releaseNumber)
 		binPath := filepath.Join(releaseNumberPath, "bin") // Path to ppBinPath = C:\Gitlab\Utilities\config-scripts\schedulerSelected\bin
@@ -891,13 +909,19 @@ func main() {
 
 			// Copy new engagement files.
 			tasks := []fileCopyTask{
-				{relativeSourcePath: filepath.Join("Utilities", "doc", "Getting_Started_With_Serial_And_Parallel_MATLAB.docx"), destinationFileName: "Getting_Started_With_Serial_And_Parallel_MATLAB.docx", destinationBasePath: docPath},
-				{relativeSourcePath: filepath.Join("Utilities", "doc", "README.txt"), destinationFileName: "README.txt", destinationBasePath: docPath},
-				{relativeSourcePath: filepath.Join("Utilities", "pub"), destinationFileName: "", destinationBasePath: pubPath, isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "doc", "Getting_Started_With_Serial_And_Parallel_MATLAB.docx"), destinationFileName: "Getting_Started_With_Serial_And_Parallel_MATLAB.docx", destinationBasePath: docPath},
+				{sourceFile: filepath.Join("Utilities", "doc", "README.txt"), destinationFileName: "README.txt", destinationBasePath: docPath},
+				{sourceFile: filepath.Join("Utilities", "pub"), destinationFileName: "", destinationBasePath: pubPath, isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "config-scripts", schedulerSelected, "bin"), destinationFileName: "", destinationBasePath: binPath, isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "helper-fcn", schedulerSelected), destinationFileName: "", destinationBasePath: filepath.Join(matlabPath), isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "helper-fcn", "common"), destinationFileName: "", destinationBasePath: filepath.Join(matlabPath), isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "conf-files"), destinationFileName: "", destinationBasePath: filepath.Join(matlabPath), isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "matlab-files"), destinationFileName: "", destinationBasePath: filepath.Join(matlabPath), isDirectory: true},
+				{sourceFile: filepath.Join(scriptsPath, "matlab-parallel-"+scheduler+"-plugin-main"), destinationFileName: "", destinationBasePath: filepath.Join(matlabPath), isDirectory: true},
 			}
 
 			for _, task := range tasks {
-				sourceFilePath := filepath.Join(gitRepoPath, task.relativeSourcePath)
+				sourceFilePath := filepath.Join(gitRepoPath, task.sourceFile)
 				destFilePath := filepath.Join(task.destinationBasePath, task.destinationFileName)
 
 				if task.isDirectory {
@@ -934,11 +958,9 @@ func main() {
 		}
 		fmt.Print("\nFinished script creation for cluster #", i, "!")
 	}
-	fmt.Print("\nSubmitting to your remote Git repo...")
-	// This is where Big Things Part 2(tm) will happen (sort of.)
 
-	// Create testing file, for now.
-	testFilePath := filepath.Join(organizationPath, "testing")
+	// The needless README.md file.
+	testFilePath := filepath.Join(organizationContactPath, "README.md")
 
 	file, err := os.Create(testFilePath)
 	if err != nil {
@@ -947,8 +969,6 @@ func main() {
 		return
 	}
 	defer file.Close()
-
-	fmt.Print("\nBlank file 'testing' created successfully at:", testFilePath)
 
 	// Create the local repo, if needed.
 	organizationDotGitFolder := filepath.Join(organizationPath, ".git")
@@ -966,28 +986,33 @@ func main() {
 		fmt.Println("\n.git directory already exists.")
 	}
 
-	// Create the repo on GitLab, if needed.
-	if needToCreateRemoteGitRepo {
-		projectURL, err := createGitLabRepo(organizationSelected, accessToken, gitRepoAPIURL, gitGroupID)
-		if err != nil {
-			fmt.Print(redText("\nError creating GitLab project: ", err))
-			os.Exit(1)
-			return
-		}
-		fmt.Print("\nGitLab project created: ", projectURL)
-	} else { // Commit the changes made and push them to the remote repo.
-		if err := remoteCommitAndPush(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
-			fmt.Print(redText("\nError committing or pushing: ", err))
-			os.Exit(1)
-			return
-		}
-	}
+	// This is where Big Things Part 2(tm) will happen (sort of.)
+	if submitToRemoteRepo {
+		fmt.Print("\nSubmitting to your remote Git repo...")
 
-	if needToCreateRemoteGitRepo {
-		if err := publishMainBranch(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
-			fmt.Print(redText("\nError publishing main branch: ", err))
-			os.Exit(1)
-			return
+		// Create the repo on GitLab, if needed.
+		if needToCreateRemoteGitRepo {
+			projectURL, err := createGitLabRepo(organizationSelected, accessToken, gitRepoAPIURL, gitGroupID)
+			if err != nil {
+				fmt.Print(redText("\nError creating GitLab project: ", err))
+				os.Exit(1)
+				return
+			}
+			fmt.Print("\nGitLab project created: ", projectURL)
+		} else { // Commit the changes made and push them to the remote repo.
+			if err := remoteCommitAndPush(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
+				fmt.Print(redText("\nError committing or pushing: ", err))
+				os.Exit(1)
+				return
+			}
+		}
+
+		if needToCreateRemoteGitRepo {
+			if err := publishMainBranch(organizationPath, organizationSelected, gitUsername, accessToken); err != nil {
+				fmt.Print(redText("\nError publishing main branch: ", err))
+				os.Exit(1)
+				return
+			}
 		}
 	}
 
@@ -1101,11 +1126,11 @@ func copyFile(src, dst string) error {
 }
 
 func copyDirectory(srcDir, destDir string) error {
-	// Create the destination directory, if we haven't already.
-	err := os.MkdirAll(destDir, 0755)
-	if err != nil {
-		return err
-	}
+	// // Create the destination directory, if we haven't already.
+	// err := os.MkdirAll(destDir, 0755)
+	// if err != nil {
+	// 	return err
+	// }
 
 	entries, err := os.ReadDir(srcDir)
 	if err != nil {

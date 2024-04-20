@@ -11,3 +11,4 @@ gitRepoAPIURL = https://gitlab.com/api/v4/projects/
 gitUsername = Jestzer
 releaseNumber = R2024a
 team = parallel
+submitToRemoteRepo = false
