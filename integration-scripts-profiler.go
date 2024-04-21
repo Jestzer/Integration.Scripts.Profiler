@@ -627,13 +627,13 @@ func main() {
 
 		// Map numbers to actual scheduler names.
 		schedulerMap := map[int]string{
-			1: "Slurm",
-			2: "PBS",
-			3: "LSF",
-			4: "Grid Engine",
-			5: "HTCondor",
-			6: "AWS",
-			7: "Kubernetes",
+			1: "slurm",
+			2: "pbs",
+			3: "lsf",
+			4: "grid engine",
+			5: "htcondor",
+			6: "aws",
+			7: "kubernetes",
 		}
 
 		// waaaahhhh it's too difficult to just say "while".
@@ -652,7 +652,7 @@ func main() {
 			}
 
 			if schedulerSelected == "" {
-				schedulerSelected = "Slurm"
+				schedulerSelected = "slurm"
 				break
 			}
 
@@ -884,28 +884,16 @@ func main() {
 		organizationContactPath = filepath.Join(organizationPath, organizationContact)
 		docPath := filepath.Join(organizationContactPath, "doc")
 		pubPath := filepath.Join(organizationContactPath, "pub")
-		scriptsPath := filepath.Join(organizationContactPath, "scripts")
-		schedulerPath := filepath.Join(scriptsPath, schedulerSelected)
+		organizationScriptsPath := filepath.Join(organizationContactPath, "scripts")
+		schedulerPath := filepath.Join(organizationScriptsPath, schedulerSelected)
 		releaseNumberPath := filepath.Join(schedulerPath, releaseNumber)
 		binPath := filepath.Join(releaseNumberPath, "bin") // Path to ppBinPath = C:\Gitlab\Utilities\config-scripts\schedulerSelected\bin
 		matlabPath := filepath.Join(releaseNumberPath, "matlab")
 		IntegrationScriptsPath := filepath.Join(matlabPath, "IntegrationScripts")
+		clusterSpecificIntegrationScriptsPath := filepath.Join(IntegrationScriptsPath, clusterName)
 
 		// Let's assume you aren't massively screwing with things. We should only need to do these things once.
 		if i == 1 {
-
-			// Create the necessary directories, if they don't already exist.
-			newEngagementPaths := []string{organizationPath, organizationContactPath, docPath, pubPath, scriptsPath, schedulerPath, releaseNumberPath, binPath, matlabPath, IntegrationScriptsPath}
-
-			// Iterate over each path.
-			for _, path := range newEngagementPaths {
-				err := ensureDir(path)
-				if err != nil {
-					msg := fmt.Sprintf("\nError creating directory: %s", err)
-					fmt.Print(redText(msg))
-					os.Exit(1)
-				}
-			}
 
 			// Copy new engagement files.
 			tasks := []fileCopyTask{
@@ -913,11 +901,10 @@ func main() {
 				{sourceFile: filepath.Join("Utilities", "doc", "README.txt"), destinationFileName: "README.txt", destinationBasePath: docPath},
 				{sourceFile: filepath.Join("Utilities", "pub"), destinationFileName: "", destinationBasePath: pubPath, isDirectory: true},
 				{sourceFile: filepath.Join("Utilities", "config-scripts", schedulerSelected, "bin"), destinationFileName: "", destinationBasePath: binPath, isDirectory: true},
-				{sourceFile: filepath.Join("Utilities", "helper-fcn", schedulerSelected), destinationFileName: "", destinationBasePath: filepath.Join(matlabPath), isDirectory: true},
-				{sourceFile: filepath.Join("Utilities", "helper-fcn", "common"), destinationFileName: "", destinationBasePath: filepath.Join(matlabPath), isDirectory: true},
-				{sourceFile: filepath.Join("Utilities", "conf-files"), destinationFileName: "", destinationBasePath: filepath.Join(matlabPath), isDirectory: true},
-				{sourceFile: filepath.Join("Utilities", "matlab-files"), destinationFileName: "", destinationBasePath: filepath.Join(matlabPath), isDirectory: true},
-				{sourceFile: filepath.Join(scriptsPath, "matlab-parallel-"+scheduler+"-plugin-main"), destinationFileName: "", destinationBasePath: filepath.Join(matlabPath), isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "helper-fcn", schedulerSelected), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "helper-fcn", "common"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "conf-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "matlab-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
 			}
 
 			for _, task := range tasks {
@@ -946,6 +933,12 @@ func main() {
 		if err != nil {
 			msg := fmt.Sprintf("\nError creating directory: %s", err)
 			fmt.Print(redText(msg))
+			os.Exit(1)
+		}
+
+		err := copyDirectory(filepath.Join(scriptsPath, "matlab-parallel-"+schedulerSelected+"-plugin-main"), clusterSpecificIntegrationScriptsPath)
+		if err != nil {
+			fmt.Print(redText("\nFailed to copy the directory:", err))
 			os.Exit(1)
 		}
 
@@ -1014,9 +1007,8 @@ func main() {
 				return
 			}
 		}
+		fmt.Print("\nPushed to GitLab successfully.")
 	}
-
-	fmt.Print("\nPushed to GitLab successfully.")
 	fmt.Print("\nFinished!")
 }
 
@@ -1100,6 +1092,12 @@ func ensureDir(path string) error {
 
 func copyFile(src, dst string) error {
 
+	// Ensure the destination directory exists.
+	destDir := filepath.Dir(dst)
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return err
+	}
+
 	// Open the source file for reading.
 	sourceFile, err := os.Open(src)
 	if err != nil {
@@ -1107,7 +1105,7 @@ func copyFile(src, dst string) error {
 	}
 	defer sourceFile.Close()
 
-	// Create the destination file for writing.
+	// Create the destination file.
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return err
@@ -1126,11 +1124,11 @@ func copyFile(src, dst string) error {
 }
 
 func copyDirectory(srcDir, destDir string) error {
-	// // Create the destination directory, if we haven't already.
-	// err := os.MkdirAll(destDir, 0755)
-	// if err != nil {
-	// 	return err
-	// }
+	// Create the destination directory, if we haven't already.
+	err := os.MkdirAll(destDir, 0755)
+	if err != nil {
+		return err
+	}
 
 	entries, err := os.ReadDir(srcDir)
 	if err != nil {
