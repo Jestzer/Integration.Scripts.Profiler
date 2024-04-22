@@ -882,14 +882,8 @@ func main() {
 		// These will be used in and out of if statements, so let's setup them up now.
 		organizationContactPath = filepath.Join(organizationPath, organizationContact)
 		docPath := filepath.Join(organizationContactPath, "doc")
-		pubPath := filepath.Join(organizationContactPath, "pub")
-		organizationScriptsPath := filepath.Join(organizationContactPath, "scripts")
-		schedulerPath := filepath.Join(organizationScriptsPath, schedulerSelected)
-		releaseNumberPath := filepath.Join(schedulerPath, releaseNumber)
-		binPath := filepath.Join(releaseNumberPath, "bin") // Path to ppBinPath = C:\Gitlab\Utilities\config-scripts\schedulerSelected\bin
-		matlabPath := filepath.Join(releaseNumberPath, "matlab")
+		matlabPath := filepath.Join(organizationContactPath, "scripts", schedulerSelected, releaseNumber, "matlab")
 		IntegrationScriptsPath := filepath.Join(matlabPath, "IntegrationScripts")
-		clusterSpecificIntegrationScriptsPath := filepath.Join(IntegrationScriptsPath, clusterName)
 
 		// Let's assume you aren't massively screwing with things. We should only need to do these things once.
 		if i == 1 {
@@ -898,8 +892,8 @@ func main() {
 			tasks := []fileCopyTask{
 				{sourceFile: filepath.Join("Utilities", "doc", "Getting_Started_With_Serial_And_Parallel_MATLAB.docx"), destinationFileName: "Getting_Started_With_Serial_And_Parallel_MATLAB.docx", destinationBasePath: docPath},
 				{sourceFile: filepath.Join("Utilities", "doc", "README.txt"), destinationFileName: "README.txt", destinationBasePath: docPath},
-				{sourceFile: filepath.Join("Utilities", "pub"), destinationFileName: "", destinationBasePath: pubPath, isDirectory: true},
-				{sourceFile: filepath.Join("Utilities", "config-scripts", schedulerSelected, "bin"), destinationFileName: "", destinationBasePath: binPath, isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "pub"), destinationFileName: "", destinationBasePath: filepath.Join(organizationContactPath, "pub"), isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "config-scripts", schedulerSelected, "bin"), destinationFileName: "", destinationBasePath: filepath.Join(organizationContactPath, "scripts", schedulerSelected, releaseNumber, "bin"), isDirectory: true},
 				{sourceFile: filepath.Join("Utilities", "helper-fcn", schedulerSelected), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
 				{sourceFile: filepath.Join("Utilities", "helper-fcn", "common"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
 				{sourceFile: filepath.Join("Utilities", "conf-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
@@ -935,7 +929,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		err := copyDirectory(filepath.Join(scriptsPath, "matlab-parallel-"+schedulerSelected+"-plugin-main"), clusterSpecificIntegrationScriptsPath)
+		err := copyDirectory(filepath.Join(scriptsPath, "matlab-parallel-"+schedulerSelected+"-plugin-main"), filepath.Join(IntegrationScriptsPath, clusterName))
 		if err != nil {
 			fmt.Print(redText("\nFailed to copy the directory:", err))
 			os.Exit(1)
