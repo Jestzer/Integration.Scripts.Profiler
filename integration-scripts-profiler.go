@@ -601,7 +601,7 @@ func main() {
 	// Loop cluster creation for as many times as you specified.
 	for i := 1; i <= clusterCount; i++ {
 		for {
-			fmt.Print("Enter cluster #", i, "'s name. Entering nothing will use \"HPC\"\n")
+			fmt.Print("\nEnter cluster #", i, "'s name. Entering nothing will use \"HPC\"\n")
 			clusterName, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
@@ -636,7 +636,6 @@ func main() {
 			7: "kubernetes",
 		}
 
-		// waaaahhhh it's too difficult to just say "while".
 		for {
 			fmt.Print("Select the scheduler you'd like to use by entering its corresponding number. Entering nothing will select Slurm.\n")
 			fmt.Print("[1 Slurm] [2 PBS] [3 LSF] [4 Grid Engine] [5 HTCondor] [6 AWS] [7 Kubernetes]\n")
@@ -668,9 +667,9 @@ func main() {
 
 			if schedulerNumberSelected < 1 || schedulerNumberSelected > 7 {
 				fmt.Print(redText("\nYou selected an invalid number. You must select a number between 1-7.\n"))
-				schedulerSelected = schedulerMap[schedulerNumberSelected]
 				continue
 			} else {
+				schedulerSelected = schedulerMap[schedulerNumberSelected]
 				break
 			}
 		}
