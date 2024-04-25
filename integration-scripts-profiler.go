@@ -101,6 +101,7 @@ func main() {
 	var clusterMatlabRoot string
 	var clusterHostname string
 	var remoteJobStorageLocation string
+	var includeRemoteConfigFiles bool = false
 
 	// Setup for better Ctrl+C messaging. This is a channel to receive OS signals.
 	signalChan := make(chan os.Signal, 1)
@@ -630,7 +631,7 @@ func main() {
 			1: "slurm",
 			2: "pbs",
 			3: "lsf",
-			4: "grid engine",
+			4: "gridengine",
 			5: "htcondor",
 			6: "aws",
 			7: "kubernetes",
@@ -740,7 +741,30 @@ func main() {
 			}
 		}
 
-		// # Add some code that'll ask the user if they want to include the remote submission scripts.
+		for {
+			fmt.Print("Would you like to include the Remote submission configuration files? (y/n)\n")
+			input, err = rl.Readline()
+			if err != nil {
+				if err.Error() == "Interrupt" {
+					fmt.Print(redText("\nExiting from user input."))
+				} else {
+					fmt.Print(redText("\nError reading line: ", err))
+					continue
+				}
+				return
+			}
+			input = strings.TrimSpace(strings.ToLower(input))
+
+			if input == "y" || input == "yes" {
+				includeRemoteConfigFiles = true
+				break
+			} else if input == "n" || input == "no" {
+				break
+			} else {
+				fmt.Print(redText("Invalid entry.\n"))
+				continue
+			}
+		}
 
 		for {
 			fmt.Print("Enter the number of workers available on the cluster's license. Entering nothing will select 100,000.\n")
@@ -876,7 +900,7 @@ func main() {
 				}
 			}
 		}
-		fmt.Print("\nCreating integration scripts for cluster #", i, "...\n")
+		fmt.Print("\nCreating integration scripts for cluster #", i, "...")
 
 		// This is where Big Things Part 1(tm) will happen.
 		// These will be used in and out of if statements, so let's setup them up now.
@@ -893,11 +917,6 @@ func main() {
 				{sourceFile: filepath.Join("Utilities", "doc", "Getting_Started_With_Serial_And_Parallel_MATLAB.docx"), destinationFileName: "Getting_Started_With_Serial_And_Parallel_MATLAB.docx", destinationBasePath: docPath},
 				{sourceFile: filepath.Join("Utilities", "doc", "README.txt"), destinationFileName: "README.txt", destinationBasePath: docPath},
 				{sourceFile: filepath.Join("Utilities", "pub"), destinationFileName: "", destinationBasePath: filepath.Join(organizationContactPath, "pub"), isDirectory: true},
-				{sourceFile: filepath.Join("Utilities", "config-scripts", schedulerSelected, "bin"), destinationFileName: "", destinationBasePath: filepath.Join(organizationContactPath, "scripts", schedulerSelected, releaseNumber, "bin"), isDirectory: true},
-				{sourceFile: filepath.Join("Utilities", "helper-fcn", schedulerSelected), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
-				{sourceFile: filepath.Join("Utilities", "helper-fcn", "common"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
-				{sourceFile: filepath.Join("Utilities", "conf-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
-				{sourceFile: filepath.Join("Utilities", "matlab-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
 			}
 
 			for _, task := range tasks {
@@ -907,7 +926,7 @@ func main() {
 				if task.isDirectory {
 					err := copyDirectory(sourceFilePath, destFilePath)
 					if err != nil {
-						fmt.Print(redText("\nFailed to copy the directory:", err))
+						fmt.Print(redText("\nFailed to copy the directory: ", err))
 						os.Exit(1)
 					}
 				} else {
@@ -921,24 +940,58 @@ func main() {
 		}
 
 		// Back to make cluster i's stuff!
-		clusterNamePath := filepath.Join(IntegrationScriptsPath, clusterName)
-		err = ensureDir(clusterNamePath)
-		if err != nil {
-			msg := fmt.Sprintf("\nError creating directory: %s", err)
-			fmt.Print(redText(msg))
-			os.Exit(1)
+		tasks := []fileCopyTask{
+			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "config-scripts", schedulerSelected, "bin"), destinationFileName: "", destinationBasePath: filepath.Join(organizationContactPath, "scripts", schedulerSelected, releaseNumber, "bin"), isDirectory: true},
+			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "helper-fcn", schedulerSelected), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
+			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "helper-fcn", "common"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
+			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "conf-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
+			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "matlab-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
+			{sourceFile: filepath.Join(scriptsPath, "matlab-parallel-"+schedulerSelected+"-plugin-main"), destinationFileName: "", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName), isDirectory: true},
 		}
 
-		err := copyDirectory(filepath.Join(scriptsPath, "matlab-parallel-"+schedulerSelected+"-plugin-main"), filepath.Join(IntegrationScriptsPath, clusterName))
-		if err != nil {
-			fmt.Print(redText("\nFailed to copy the directory:", err))
-			os.Exit(1)
+		for _, task := range tasks {
+			destFilePath := filepath.Join(task.destinationBasePath, task.destinationFileName)
+
+			if task.isDirectory {
+				err := copyDirectory(task.sourceFile, destFilePath)
+				if err != nil {
+					fmt.Print(redText("\nFailed to copy the directory: ", err))
+					os.Exit(1)
+				}
+			} else {
+				err := copyFile(task.sourceFile, destFilePath)
+				if err != nil {
+					fmt.Print(redText("\nFailed to copy the file:", err))
+					os.Exit(1)
+				}
+			}
 		}
 
-		// These are just here for now to make Go shut the hell up.
-		if customMPI {
-			fmt.Print("\nyou did it. custom mpi. yipee.")
+		// Yes, the method I'm using is to delete the files after all possibly needed ones are copied.
+		if !customMPI {
+			fileToDelete := filepath.Join(matlabPath, "mpiLibConf.m")
+			err := deleteFile(fileToDelete)
+			if err != nil {
+				fmt.Print(redText("\nFailed to delete the file:", err))
+				os.Exit(1)
+			}
 		}
+
+		if !includeRemoteConfigFiles {
+			filesToDelete := []string{
+				filepath.Join(matlabPath, "hpcRemoteCluster.conf"),
+				filepath.Join(matlabPath, "hpcRemoteDesktop.conf"),
+			}
+
+			for _, fileToDelete := range filesToDelete {
+				err := deleteFile(fileToDelete)
+				if err != nil {
+					fmt.Println(redText("\nFailed to delete the file:", err))
+					os.Exit(1)
+				}
+			}
+		}
+
 		if remoteJobStorageLocation != "" {
 			fmt.Print("\nomg remotejobstl: ", remoteJobStorageLocation)
 		}
@@ -1074,9 +1127,8 @@ func unzipFile(src, dest string) error {
 	return nil
 }
 
-// If the directory doesn't already exist, make it!
-func ensureDir(path string) error {
-	err := os.MkdirAll(path, 0755)
+func deleteFile(file string) error {
+	err := os.Remove(file)
 	if err != nil {
 		return err
 	}
@@ -1111,7 +1163,7 @@ func copyFile(src, dst string) error {
 		return err
 	}
 
-	// Ensure that any writes to the destination file are committed.
+	// Ensure that any writes to the destination file are synced.
 	err = destFile.Sync()
 	return err
 }
