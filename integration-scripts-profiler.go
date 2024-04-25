@@ -58,8 +58,8 @@ var (
 	organizationSelected         string
 	gitExistingRepoCommitMessage string
 	gitGroupID                   int
-	gitRepoAPIURL                string
 	gitGroupName                 string
+	gitRepoAPIURL                string
 	gitUsername                  string
 	gitEmailAddress              string
 	needToCreateRemoteGitRepo    bool
@@ -83,25 +83,26 @@ func main() {
 	redText := color.New(color.FgRed).SprintFunc()
 
 	// Goodies.
-	var input string
-	var scriptsPath string
-	var downloadScriptsOnLanuch bool = true
 	var caseNumber int
+	var clusterCount int
+	var clusterHostname string
+	var clusterMatlabRoot string
+	var clusterName string
+	var customMPI bool = false
+	var customMPIInput string
+	var downloadScriptsOnLanuch bool = true
 	var gitRepoPath string
-	var schedulerSelected string
+	var includeRemoteConfigFiles bool = false
+	var input string
+	var numberOfWorkers int
 	var organizationContact string
 	var organizationContactPath string
-	var customMPIInput string
-	var customMPI bool
-	var clusterCount int
-	var clusterName string
-	var submissionType string
-	var numberOfWorkers int
-	var hasSharedFileSystem bool
-	var clusterMatlabRoot string
-	var clusterHostname string
 	var remoteJobStorageLocation string
-	var includeRemoteConfigFiles bool = false
+	var schedulerSelected string
+	var scriptsPath string
+	var submissionType string
+	var tmpFolder string
+	var tmpOrganizationContactPath string
 
 	// Setup for better Ctrl+C messaging. This is a channel to receive OS signals.
 	signalChan := make(chan os.Signal, 1)
@@ -144,6 +145,9 @@ func main() {
 		fmt.Print(redText("\nYour operating system is unrecognized. Exiting."))
 		os.Exit(1)
 	}
+
+	// We want to remember this, even if you decide to change your scriptsPath.
+	tmpFolder = scriptsPath
 
 	// Determine any user-defined settings.
 	currentDir, err := os.Getwd() // Get the current working directory.
@@ -633,7 +637,7 @@ func main() {
 			3: "lsf",
 			4: "gridengine",
 			5: "htcondor",
-			6: "aws",
+			6: "awsbatch",
 			7: "kubernetes",
 		}
 
@@ -688,16 +692,10 @@ func main() {
 				return
 			}
 
-			strings.TrimSpace(strings.ToLower(customMPIInput))
-
-			if customMPIInput == "" {
-				customMPI = false
-				break
-			} else if customMPIInput == "y" || customMPIInput == "yes" {
+			if customMPIInput == "y" || customMPIInput == "yes" {
 				customMPI = true
 				break
-			} else if customMPIInput == "n" || customMPIInput == "no" {
-				customMPI = false
+			} else if customMPIInput == "n" || customMPIInput == "no" || customMPIInput == "" {
 				break
 			} else {
 				fmt.Print(redText("\nInvalid input. You must enter one of the following: \"y\" or \"n\".\n"))
@@ -742,7 +740,7 @@ func main() {
 		}
 
 		for {
-			fmt.Print("Would you like to include the Remote submission configuration files? (y/n)\n")
+			fmt.Print("Would you like to include the Remote submission configuration files? (y/n) Entering nothing will exclude them.\n")
 			input, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
@@ -758,7 +756,7 @@ func main() {
 			if input == "y" || input == "yes" {
 				includeRemoteConfigFiles = true
 				break
-			} else if input == "n" || input == "no" {
+			} else if input == "n" || input == "no" || input == "" {
 				break
 			} else {
 				fmt.Print(redText("Invalid entry.\n"))
@@ -804,33 +802,6 @@ func main() {
 		}
 
 		if submissionType == "desktop" || submissionType == "both" {
-			for {
-				fmt.Print("Does the client have a shared filesystem with the cluster? (y/n)\n")
-				input, err = rl.Readline()
-				if err != nil {
-					if err.Error() == "Interrupt" {
-						fmt.Print(redText("\nExiting from user input."))
-					} else {
-						fmt.Print(redText("\nError reading line: ", err))
-						continue
-					}
-					return
-				}
-				input = strings.TrimSpace(strings.ToLower(input))
-
-				if input == "y" || input == "yes" {
-					hasSharedFileSystem = true
-					break
-					fmt.Print(hasSharedFileSystem) // Again, shut up, Go. It'll be used at some point, I promise.
-				} else if input == "n" || input == "no" {
-					hasSharedFileSystem = false
-					break
-				} else {
-					fmt.Print(redText("Invalid entry.\n"))
-					continue
-				}
-			}
-
 			for {
 				fmt.Print("What is the full filepath of MATLAB on the cluster? (ex: /usr/local/MATLAB/R2023b)\n")
 				clusterMatlabRoot, err = rl.Readline()
@@ -905,8 +876,9 @@ func main() {
 		// This is where Big Things Part 1(tm) will happen.
 		// These will be used in and out of if statements, so let's setup them up now.
 		organizationContactPath = filepath.Join(organizationPath, organizationContact)
-		docPath := filepath.Join(organizationContactPath, "doc")
-		matlabPath := filepath.Join(organizationContactPath, "scripts", schedulerSelected, releaseNumber, "matlab")
+		tmpOrganizationContactPath = filepath.Join(tmpFolder, organizationContact)
+		docPath := filepath.Join(tmpOrganizationContactPath, "doc")
+		matlabPath := filepath.Join(tmpOrganizationContactPath, "scripts", schedulerSelected, releaseNumber, "matlab")
 		IntegrationScriptsPath := filepath.Join(matlabPath, "IntegrationScripts")
 
 		// Let's assume you aren't massively screwing with things. We should only need to do these things once.
@@ -916,7 +888,7 @@ func main() {
 			tasks := []fileCopyTask{
 				{sourceFile: filepath.Join("Utilities", "doc", "Getting_Started_With_Serial_And_Parallel_MATLAB.docx"), destinationFileName: "Getting_Started_With_Serial_And_Parallel_MATLAB.docx", destinationBasePath: docPath},
 				{sourceFile: filepath.Join("Utilities", "doc", "README.txt"), destinationFileName: "README.txt", destinationBasePath: docPath},
-				{sourceFile: filepath.Join("Utilities", "pub"), destinationFileName: "", destinationBasePath: filepath.Join(organizationContactPath, "pub"), isDirectory: true},
+				{sourceFile: filepath.Join("Utilities", "pub"), destinationFileName: "", destinationBasePath: filepath.Join(tmpOrganizationContactPath, "pub"), isDirectory: true},
 			}
 
 			for _, task := range tasks {
@@ -927,13 +899,13 @@ func main() {
 					err := copyDirectory(sourceFilePath, destFilePath)
 					if err != nil {
 						fmt.Print(redText("\nFailed to copy the directory: ", err))
-						os.Exit(1)
+						cleanUpTempFiles(tmpOrganizationContactPath)
 					}
 				} else {
 					err := copyFile(sourceFilePath, destFilePath)
 					if err != nil {
-						fmt.Print(redText("\nFailed to copy the file:", err))
-						os.Exit(1)
+						fmt.Print(redText("\nFailed to copy the file: ", err))
+						cleanUpTempFiles(tmpOrganizationContactPath)
 					}
 				}
 			}
@@ -941,7 +913,11 @@ func main() {
 
 		// Back to make cluster i's stuff!
 		tasks := []fileCopyTask{
-			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "config-scripts", schedulerSelected, "bin"), destinationFileName: "", destinationBasePath: filepath.Join(organizationContactPath, "scripts", schedulerSelected, releaseNumber, "bin"), isDirectory: true},
+			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "config-scripts", schedulerSelected, "bin"), destinationFileName: "", destinationBasePath: filepath.Join(tmpOrganizationContactPath, "scripts", schedulerSelected, releaseNumber, "bin"), isDirectory: true},
+			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "+pctDebug", "ClientJavaLogging.p"), destinationFileName: "ClientJavaLogging.p", destinationBasePath: filepath.Join(matlabPath, "+pctDebug")},
+			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "+pctDebug", "ClientJavaMessageHandler.p"), destinationFileName: "ClientJavaMessageHandler.p", destinationBasePath: filepath.Join(matlabPath, "+pctDebug")},
+			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "+pctDebug", "Finalize.p"), destinationFileName: "Finalize.p", destinationBasePath: filepath.Join(matlabPath, "+pctDebug")},
+			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "+pctDebug", "Init.p"), destinationFileName: "Init.p", destinationBasePath: filepath.Join(matlabPath, "+pctDebug")},
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "helper-fcn", schedulerSelected), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "helper-fcn", "common"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "conf-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
@@ -949,31 +925,52 @@ func main() {
 			{sourceFile: filepath.Join(scriptsPath, "matlab-parallel-"+schedulerSelected+"-plugin-main"), destinationFileName: "", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName), isDirectory: true},
 		}
 
-		for _, task := range tasks {
+		for i, task := range tasks {
+
+			// They don't have anything special for these schedulers.
+			if schedulerSelected == "awsbatch" || schedulerSelected == "kubernetes" || schedulerSelected == "htcondor" && (i == 0 || i == 5) {
+				continue
+			}
+
 			destFilePath := filepath.Join(task.destinationBasePath, task.destinationFileName)
 
 			if task.isDirectory {
 				err := copyDirectory(task.sourceFile, destFilePath)
 				if err != nil {
 					fmt.Print(redText("\nFailed to copy the directory: ", err))
-					os.Exit(1)
+					cleanUpTempFiles(tmpOrganizationContactPath)
 				}
 			} else {
 				err := copyFile(task.sourceFile, destFilePath)
 				if err != nil {
-					fmt.Print(redText("\nFailed to copy the file:", err))
-					os.Exit(1)
+					fmt.Print(redText("\nFailed to copy the file: ", err))
+					cleanUpTempFiles(tmpOrganizationContactPath)
 				}
 			}
 		}
 
 		// Yes, the method I'm using is to delete the files after all possibly needed ones are copied.
+		filesToDelete := []string{
+			filepath.Join(matlabPath, "mdcs.rc"),
+			filepath.Join(matlabPath, "licenseCheck.m"),
+			filepath.Join(matlabPath, "parseGenericTemplateFile.m"),
+			filepath.Join(IntegrationScriptsPath, clusterName, "discover"),
+		}
+
+		for _, fileToDelete := range filesToDelete {
+			err := deleteFileOrFolder(fileToDelete)
+			if err != nil {
+				fmt.Println(redText("\nFailed to delete the file or folder: ", err))
+				cleanUpTempFiles(tmpOrganizationContactPath)
+			}
+		}
+
 		if !customMPI {
 			fileToDelete := filepath.Join(matlabPath, "mpiLibConf.m")
-			err := deleteFile(fileToDelete)
+			err := deleteFileOrFolder(fileToDelete)
 			if err != nil {
-				fmt.Print(redText("\nFailed to delete the file:", err))
-				os.Exit(1)
+				fmt.Print(redText("\nFailed to delete the file: ", err))
+				cleanUpTempFiles(tmpOrganizationContactPath)
 			}
 		}
 
@@ -984,10 +981,10 @@ func main() {
 			}
 
 			for _, fileToDelete := range filesToDelete {
-				err := deleteFile(fileToDelete)
+				err := deleteFileOrFolder(fileToDelete)
 				if err != nil {
-					fmt.Println(redText("\nFailed to delete the file:", err))
-					os.Exit(1)
+					fmt.Println(redText("\nFailed to delete the file: ", err))
+					cleanUpTempFiles(tmpOrganizationContactPath)
 				}
 			}
 		}
@@ -998,14 +995,20 @@ func main() {
 		fmt.Print("\nFinished script creation for cluster #", i, "!")
 	}
 
+	// Move everything to its permanent location.
+	err = moveDirectory(tmpOrganizationContactPath, organizationContactPath)
+	if err != nil {
+		fmt.Println(redText("\nFailed to move the file: "), err)
+		cleanUpTempFiles(tmpOrganizationContactPath)
+	}
+
 	// The needless README.md file.
 	testFilePath := filepath.Join(organizationContactPath, "README.md")
 
 	file, err := os.Create(testFilePath)
 	if err != nil {
 		fmt.Print(redText("\nError creating file: ", err))
-		os.Exit(1)
-		return
+		cleanUpTempFiles(tmpOrganizationContactPath)
 	}
 	defer file.Close()
 
@@ -1014,7 +1017,7 @@ func main() {
 
 	if _, err := os.Stat(organizationDotGitFolder); os.IsNotExist(err) {
 		if err := createLocalGitRepo(organizationPath); err != nil {
-			fmt.Println(redText("\nError creating local Git repo:", err))
+			fmt.Println(redText("\nError creating local Git repo: ", err))
 			os.Exit(1)
 		}
 	} else if err != nil {
@@ -1056,6 +1059,18 @@ func main() {
 		fmt.Print("\nPushed to GitLab successfully.")
 	}
 	fmt.Print("\nFinished!")
+}
+
+func cleanUpTempFiles(tmpOrganizationContactPath string) error {
+	redText := color.New(color.FgRed).SprintFunc()
+
+	err := deleteFileOrFolder(tmpOrganizationContactPath)
+	if err != nil {
+		fmt.Print(redText("\nError deleting temporary engagement files: ", err))
+		os.Exit(2)
+	}
+	os.Exit(2)
+	return err
 }
 
 // Function to download a file from a given URL and save it to the specified path.
@@ -1127,8 +1142,25 @@ func unzipFile(src, dest string) error {
 	return nil
 }
 
-func deleteFile(file string) error {
-	err := os.Remove(file)
+func moveDirectory(src, dst string) error {
+
+	// First, copy the directory and its contents to the new location.
+	err := copyDirectory(src, dst)
+	if err != nil {
+		return err
+	}
+
+	// Then, remove the original directory.
+	err = os.RemoveAll(src)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func deleteFileOrFolder(file string) error {
+	err := os.RemoveAll(file)
 	if err != nil {
 		return err
 	}
