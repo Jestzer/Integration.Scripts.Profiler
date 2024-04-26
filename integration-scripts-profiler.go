@@ -122,13 +122,19 @@ func main() {
 	// Regexp compile used for detecting things with numbers and letters.
 	lettersAndNumbersPattern, err := regexp.Compile(`^[^a-zA-Z0-9]+$`)
 	if err != nil {
-		fmt.Print(redText("\nError compiling regex pattern: ", err, " Exiting."))
+		fmt.Print(redText("\nError compiling regex lettersAndNumbersPattern: ", err))
 		os.Exit(1)
 	}
 
 	lettersPattern, err := regexp.Compile(`^[^a-zA-Z]+$`)
 	if err != nil {
-		fmt.Print(redText("\nError compiling regex pattern: ", err, " Exiting."))
+		fmt.Print(redText("\nError compiling regex lettersPattern: ", err))
+		os.Exit(1)
+	}
+
+	removeBannedSymbols, err := regexp.Compile("[^a-zA-Z0-9._-]+")
+	if err != nil {
+		fmt.Print(redText("\nError compiling regex removeBannedSymbols:", err))
 		os.Exit(1)
 	}
 
@@ -414,9 +420,10 @@ func main() {
 		}
 		organizationSelected = strings.TrimSpace(organizationSelected)
 		organizationSelected = strings.ReplaceAll(organizationSelected, " ", "-")
+		organizationSelected = removeBannedSymbols.ReplaceAllString(organizationSelected, "")
 
 		if organizationSelected == "" {
-			fmt.Print(redText("Invalid entry. "))
+			fmt.Print(redText("Invalid input. You must input something here."))
 			continue
 		} else {
 			break
@@ -521,7 +528,6 @@ func main() {
 			}
 
 			organizationContact = strings.TrimSpace(organizationContact)
-			organizationContact = strings.ReplaceAll(organizationContact, " ", "-")
 
 			if organizationContact == "" {
 				organizationContact = "first-last"
@@ -530,6 +536,8 @@ func main() {
 				fmt.Print(redText("\nInvalid input. You may only use letters in the contact name and at least 1 letter is required.\n"))
 				continue
 			} else {
+				organizationContact = strings.ReplaceAll(organizationContact, " ", "-")
+				organizationContact = removeBannedSymbols.ReplaceAllString(organizationContact, "")
 				break
 			}
 		}
@@ -553,7 +561,7 @@ func main() {
 			// Don't accept anything other than numbers and blank input.
 			if input == "" {
 				break
-			} else if _, err := strconv.Atoi(input); err == nil && input != "" { // # Add som code to do something with the potential error message.
+			} else if _, err := strconv.Atoi(input); err == nil && input != "" {
 				caseNumber, _ = strconv.Atoi(input)
 				if caseNumber < 01000000 {
 					fmt.Print(redText("\nAre you sure that's the right Case Number? It seems a bit too small.\n"))
@@ -564,7 +572,7 @@ func main() {
 				}
 				break
 			} else {
-				fmt.Print(redText("\nInvalid entry. "))
+				fmt.Print(redText("\nInvalid input. You must input nothing or a valid case number."))
 				continue
 			}
 		}
@@ -593,12 +601,12 @@ func main() {
 		if _, err := strconv.Atoi(input); err == nil {
 			clusterCount, _ = strconv.Atoi(input)
 			if clusterCount < 1 {
-				fmt.Print(redText("\nInvalid entry. You've selected zero or less clusters to create scripts for.\n"))
+				fmt.Print(redText("\nInvalid input. You've selected zero or less clusters to create scripts for.\n"))
 				continue
 			}
 			break
 		} else {
-			fmt.Print(redText("\nInvalid entry. Please enter an integer greater than zero.\n"))
+			fmt.Print(redText("\nInvalid input. Please enter an integer greater than zero.\n"))
 			continue
 		}
 	}
@@ -622,6 +630,7 @@ func main() {
 			profileName = strings.TrimSpace(clusterName)
 			clusterName = strings.TrimSpace(strings.ToLower(clusterName))
 			clusterName = strings.ReplaceAll(clusterName, " ", "-")
+			clusterName = removeBannedSymbols.ReplaceAllString(clusterName, "")
 
 			if clusterName == "" {
 				clusterName = "HPC"
@@ -696,6 +705,8 @@ func main() {
 				return
 			}
 
+			customMPIInput = strings.TrimSpace(strings.ToLower(customMPIInput))
+
 			if customMPIInput == "y" || customMPIInput == "yes" {
 				customMPI = true
 				break
@@ -738,7 +749,7 @@ func main() {
 			} else if submissionType == "cluster" || submissionType == "desktop" || submissionType == "both" {
 				break
 			} else {
-				fmt.Print(redText("\nInvalid entry. Enter a number between 1-3 to select a submission type.\n"))
+				fmt.Print(redText("\nInvalid input. Enter a number between 1-3 to select a submission type.\n"))
 				continue
 			}
 		}
@@ -763,7 +774,7 @@ func main() {
 			} else if input == "n" || input == "no" || input == "" {
 				break
 			} else {
-				fmt.Print(redText("Invalid entry.\n"))
+				fmt.Print(redText("Invalid input. You must enter one of the following: \"y\" or \"n\".\n"))
 				continue
 			}
 		}
@@ -791,15 +802,19 @@ func main() {
 			if _, err := strconv.Atoi(input); err == nil {
 				numberOfWorkers, _ = strconv.Atoi(input)
 				if numberOfWorkers < 1 {
-					fmt.Print(redText("\nInvalid entry. You've selected zero or less workers.\n"))
+					fmt.Print(redText("\nInvalid input. You've selected zero or less workers.\n"))
 					continue
 				} else if numberOfWorkers > 100000 {
-					fmt.Print(redText("\nInvalid entry. You've selected more than 100000 workers, which is not offered on any license.\n"))
+					fmt.Print(redText("\nInvalid input. You've selected more than 100000 workers, which is not offered on any license.\n"))
+					continue
+				} else if numberOfWorkers < 16 { // You've likely got bigger problems on your hands...
+					fmt.Print(redText("\nMATLAB Parallel Server licenses typically aren't issued with and may not work with less than 16 seats. You likely have a bigger issue at hand...\n"))
 					continue
 				}
+
 				break
 			} else {
-				fmt.Print(redText("Invalid entry. You've likely included a character other than a number.\n"))
+				fmt.Print(redText("Invalid input. You've likely included a character other than a number.\n"))
 				continue
 			}
 		}
@@ -842,7 +857,7 @@ func main() {
 				clusterHostname = strings.TrimSpace(clusterHostname)
 
 				if clusterHostname == "" {
-					fmt.Print(redText("Invalid entry. "))
+					fmt.Print(redText("Invalid input. You must input something here."))
 					continue
 				} else {
 					break
@@ -1001,40 +1016,40 @@ func main() {
 		}
 
 		for i, fileToModify := range filesToModify {
+			fileToModifyFullPath := filepath.Join(matlabPath, fileToModify)
 
 			if !includeRemoteConfigFiles && (i == 2 || i == 3) {
 				continue
 			}
 
-			if submissionType == "desktop" && fileToModify == "hpcCluster.conf" || submissionType == "cluster" && fileToModify == "hpcDesktop.conf" {
+			if (submissionType == "desktop" && fileToModify == "hpcCluster.conf") || (submissionType == "cluster" && fileToModify == "hpcDesktop.conf") {
 				continue
 			}
 
 			for contentToModify, modifiedContent := range originalContent {
 
-				if fileToModify == "hpcCluster.conf" || fileToModify == "hpcRemoteCluster" && contentToModify == "ClusterMatlabRoot = " {
+				if (fileToModify == "hpcCluster.conf" || fileToModify == "hpcRemoteCluster") && contentToModify == "ClusterMatlabRoot = " {
 					continue
 				} else if fileToModify == "hpcCluster.conf" && contentToModify == "ClusterHost =" {
 					continue
 				}
 
-				if schedulerSelected == "pbs" || schedulerSelected == "lsf" || schedulerSelected == "gridengine" && contentToModify == "QueueName = " {
+				if (schedulerSelected == "pbs" || schedulerSelected == "lsf" || schedulerSelected == "gridengine") && contentToModify == "QueueName = " {
 					continue
 				} else if schedulerSelected == "slurm" && contentToModify == "Partition = " {
 					continue
 				}
 
-				err = ModifyFileContents(filepath.Join(matlabPath, fileToModify), contentToModify, modifiedContent)
+				err = ModifyFileContents(fileToModifyFullPath, contentToModify, modifiedContent)
 				if err != nil {
 					fmt.Println(redText("\nFailed to modify the file: ", err))
 					cleanUpTempFiles(tmpOrganizationContactPath)
 				}
 			}
 
-			fileToModify = filepath.Join(matlabPath, fileToModify)
-			modifiedFileName := strings.ReplaceAll(fileToModify, "hpc", clusterName)
+			modifiedFileName := strings.ReplaceAll(fileToModifyFullPath, "hpc", clusterName)
 
-			err = renameFile(fileToModify, modifiedFileName)
+			err = renameFile(fileToModifyFullPath, modifiedFileName)
 			if err != nil {
 				fmt.Println(redText("\nFailed to rename the file: ", err))
 				cleanUpTempFiles(tmpOrganizationContactPath)
@@ -1126,14 +1141,17 @@ func ModifyFileContents(filePath, oldText, newText string) error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Check if the line starts with "#"
+
+		// "Ignore" commented-out lines.
 		if strings.HasPrefix(line, "#") {
-			// If so, append the original line without modification.
 			sb.WriteString(line + "\n")
 		} else {
-			// For other lines, replace oldText with newText and append.
 			modifiedLine := strings.ReplaceAll(line, oldText, newText)
-			sb.WriteString(modifiedLine + "\n")
+
+			// Only append non-empty lines that weren't already there. Delete the line otherwise.
+			if modifiedLine != "" || line == "" {
+				sb.WriteString(modifiedLine + "\n")
+			}
 		}
 	}
 
