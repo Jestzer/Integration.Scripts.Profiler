@@ -821,7 +821,7 @@ func main() {
 
 		if submissionType == "desktop" || submissionType == "both" {
 			for {
-				fmt.Print("What is the full filepath of MATLAB on the cluster? (ex: /usr/local/MATLAB/R2023b)\n")
+				fmt.Print("What is the full filepath of MATLAB on the cluster? (ex: /usr/local/MATLAB/R2024a)\n")
 				clusterMatlabRoot, err = rl.Readline()
 				if err != nil {
 					if err.Error() == "Interrupt" {
