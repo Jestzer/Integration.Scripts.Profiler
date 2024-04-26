@@ -97,7 +97,7 @@ func main() {
 	var numberOfWorkers int
 	var organizationContact string
 	var organizationContactPath string
-	var remoteJobStorageLocation string
+	var profileName string
 	var schedulerSelected string
 	var scriptsPath string
 	var submissionType string
@@ -617,7 +617,11 @@ func main() {
 				}
 				return
 			}
-			clusterName = strings.TrimSpace(clusterName)
+
+			// The "profileName" is used for the cluster profile's name.
+			profileName = strings.TrimSpace(clusterName)
+			clusterName = strings.TrimSpace(strings.ToLower(clusterName))
+			clusterName = strings.ReplaceAll(clusterName, " ", "-")
 
 			if clusterName == "" {
 				clusterName = "HPC"
@@ -740,7 +744,7 @@ func main() {
 		}
 
 		for {
-			fmt.Print("Would you like to include the Remote submission configuration files? (y/n) Entering nothing will exclude them.\n")
+			fmt.Print("Would you like to include the remote submission configuration files? (y/n) Entering nothing will exclude them.\n")
 			input, err = rl.Readline()
 			if err != nil {
 				if err.Error() == "Interrupt" {
@@ -781,7 +785,6 @@ func main() {
 			if input == "" {
 				numberOfWorkers = 100000
 				break
-				fmt.Print(numberOfWorkers) // Again, Go, shut up.
 			}
 
 			// Don't accept anything other than numbers.
@@ -843,31 +846,6 @@ func main() {
 					continue
 				} else {
 					break
-				}
-			}
-
-			for {
-				fmt.Print("Where will remote job storage location be on the cluster? Entering nothing will select /home/$USER/.matlab/generic_cluster_jobs/" + clusterName + "/$Host\n")
-				remoteJobStorageLocation, err = rl.Readline()
-				if err != nil {
-					if err.Error() == "Interrupt" {
-						fmt.Print(redText("\nExiting from user input."))
-					} else {
-						fmt.Print(redText("\nError reading line: ", err))
-						continue
-					}
-					return
-				}
-				remoteJobStorageLocation = strings.TrimSpace(remoteJobStorageLocation)
-
-				if strings.Contains(remoteJobStorageLocation, "/") || strings.Contains(clusterMatlabRoot, "\\") {
-					break
-				} else if remoteJobStorageLocation == "" {
-					remoteJobStorageLocation = "/home/$USER/.matlab/generic_cluster_jobs/" + clusterName + "/$HOST"
-					break
-				} else {
-					fmt.Print(redText("\nInvalid filepath. "))
-					continue
 				}
 			}
 		}
@@ -989,9 +967,77 @@ func main() {
 			}
 		}
 
-		if remoteJobStorageLocation != "" {
-			fmt.Print("\nomg remotejobstl: ", remoteJobStorageLocation)
+		if submissionType == "cluster" {
+			err := deleteFileOrFolder(filepath.Join(matlabPath, "hpcDesktop.conf"))
+			if err != nil {
+				fmt.Println(redText("\nFailed to delete the file: ", err))
+				cleanUpTempFiles(tmpOrganizationContactPath)
+			}
+		} else if submissionType == "desktop" {
+			err := deleteFileOrFolder(filepath.Join(matlabPath, "hpcCluster.conf"))
+			if err != nil {
+				fmt.Println(redText("\nFailed to delete the file: ", err))
+				cleanUpTempFiles(tmpOrganizationContactPath)
+			}
 		}
+
+		filesToModify := []string{
+			"hpcDesktop.conf",
+			"hpcCluster.conf",
+			"hpcRemoteDesktop.conf",
+			"hpcRemoteCluster.conf",
+		}
+
+		var stringNumberOfWorkers string = strconv.Itoa(numberOfWorkers) // Yes, I ended up just making it a string. Get over it.
+
+		originalContent := map[string]string{
+			"NumWorkers = 100000":  "NumWorkers = " + stringNumberOfWorkers,
+			"ClusterMatlabRoot = ": "ClusterMatlabRoot = " + clusterMatlabRoot,
+			"ClusterHost =":        "ClusterHost = " + clusterHostname,
+			"cluster_name":         clusterName,
+			"profile_name":         profileName,
+			"QueueName = ":         "",
+			"Partition = ":         "",
+		}
+
+		for i, fileToModify := range filesToModify {
+
+			if !includeRemoteConfigFiles && (i == 2 || i == 3) {
+				continue
+			}
+
+			for contentToModify, modifiedContent := range originalContent {
+
+				if fileToModify == "hpcCluster.conf" || fileToModify == "hpcRemoteCluster" && contentToModify == "ClusterMatlabRoot = " {
+					continue
+				} else if fileToModify == "hpcCluster.conf" && contentToModify == "ClusterHost =" {
+					continue
+				}
+
+				if schedulerSelected == "pbs" || schedulerSelected == "lsf" || schedulerSelected == "gridengine" && contentToModify == "QueueName = " {
+					continue
+				} else if schedulerSelected == "slurm" && contentToModify == "Partition = " {
+					continue
+				}
+
+				err = ModifyFileContents(filepath.Join(matlabPath, fileToModify), contentToModify, modifiedContent)
+				if err != nil {
+					fmt.Println(redText("\nFailed to modify the file: ", err))
+					cleanUpTempFiles(tmpOrganizationContactPath)
+				}
+			}
+		}
+		// Don't rename the files until we're done making all our changes.
+		// for _, fileToModify := range filesToModify {
+		// 	fileToModify = filepath.Join(matlabPath, fileToModify)
+		// 	modifiedFileName := strings.ReplaceAll(fileToModify, "hpc", clusterName)
+		// 	err = renameFile(fileToModify, modifiedFileName)
+		// 	if err != nil {
+		// 		fmt.Println(redText("\nFailed to rename the file: ", err))
+		// 		cleanUpTempFiles(tmpOrganizationContactPath)
+		// 	}
+		// }
+
 		fmt.Print("\nFinished script creation for cluster #", i, "!")
 	}
 
@@ -1061,6 +1107,50 @@ func main() {
 	fmt.Print("\nFinished!")
 }
 
+func ModifyFileContents(filePath, oldText, newText string) error {
+
+	// Open the file for reading.
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Use a StringBuilder to build the new file contents.
+	var sb strings.Builder
+
+	// Create a new scanner to read the file line by line.
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Check if the line starts with "#"
+		if strings.HasPrefix(line, "#") {
+			// If so, append the original line without modification.
+			sb.WriteString(line + "\n")
+		} else {
+			// For other lines, replace oldText with newText and append.
+			modifiedLine := strings.ReplaceAll(line, oldText, newText)
+			sb.WriteString(modifiedLine + "\n")
+		}
+	}
+
+	// Check for errors during scanning.
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	// Open the same file for writing; truncating it first.
+	file, err = os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// Write the modified contents back to the file.
+	_, err = file.WriteString(sb.String())
+	return err
+}
+
 func cleanUpTempFiles(tmpOrganizationContactPath string) error {
 	redText := color.New(color.FgRed).SprintFunc()
 
@@ -1073,7 +1163,6 @@ func cleanUpTempFiles(tmpOrganizationContactPath string) error {
 	return err
 }
 
-// Function to download a file from a given URL and save it to the specified path.
 func downloadFile(url string, filePath string) error {
 	response, err := http.Get(url)
 	if err != nil {
@@ -1138,6 +1227,14 @@ func unzipFile(src, dest string) error {
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func renameFile(oldPath, newPath string) error {
+	err := os.Rename(oldPath, newPath)
+	if err != nil {
+		return err
 	}
 	return nil
 }
