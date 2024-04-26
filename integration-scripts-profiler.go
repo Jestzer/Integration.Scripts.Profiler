@@ -1006,6 +1006,10 @@ func main() {
 				continue
 			}
 
+			if submissionType == "desktop" && fileToModify == "hpcCluster.conf" || submissionType == "cluster" && fileToModify == "hpcDesktop.conf" {
+				continue
+			}
+
 			for contentToModify, modifiedContent := range originalContent {
 
 				if fileToModify == "hpcCluster.conf" || fileToModify == "hpcRemoteCluster" && contentToModify == "ClusterMatlabRoot = " {
@@ -1026,17 +1030,16 @@ func main() {
 					cleanUpTempFiles(tmpOrganizationContactPath)
 				}
 			}
+
+			fileToModify = filepath.Join(matlabPath, fileToModify)
+			modifiedFileName := strings.ReplaceAll(fileToModify, "hpc", clusterName)
+
+			err = renameFile(fileToModify, modifiedFileName)
+			if err != nil {
+				fmt.Println(redText("\nFailed to rename the file: ", err))
+				cleanUpTempFiles(tmpOrganizationContactPath)
+			}
 		}
-		// Don't rename the files until we're done making all our changes.
-		// for _, fileToModify := range filesToModify {
-		// 	fileToModify = filepath.Join(matlabPath, fileToModify)
-		// 	modifiedFileName := strings.ReplaceAll(fileToModify, "hpc", clusterName)
-		// 	err = renameFile(fileToModify, modifiedFileName)
-		// 	if err != nil {
-		// 		fmt.Println(redText("\nFailed to rename the file: ", err))
-		// 		cleanUpTempFiles(tmpOrganizationContactPath)
-		// 	}
-		// }
 
 		fmt.Print("\nFinished script creation for cluster #", i, "!")
 	}
