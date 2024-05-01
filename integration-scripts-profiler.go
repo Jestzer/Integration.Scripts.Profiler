@@ -916,6 +916,7 @@ func main() {
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "conf-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "matlab-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
 			{sourceFile: filepath.Join(scriptsPath, "matlab-parallel-"+schedulerSelected+"-plugin-main"), destinationFileName: "", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName), isDirectory: true},
+			{sourceFile: filepath.Join(gitRepoPath, "Gold", releaseNumber, schedulerSelected, "communicatingSubmitFcn.m"), destinationFileName: "communicatingSubmitFcn.m", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName, "private")},
 		}
 
 		for i, task := range tasks {
