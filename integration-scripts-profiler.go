@@ -72,6 +72,7 @@ var (
 
 func main() {
 	// To handle keyboard input better.
+	// # Add some code to figure out why this works horribly in PWSH when slashes are used.
 	rl, err := readline.New("> ")
 	if err != nil {
 		panic(err)
@@ -905,6 +906,7 @@ func main() {
 		}
 
 		// Back to make cluster i's stuff!
+		// # Add some code that'll copy the Gold files too.
 		tasks := []fileCopyTask{
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "config-scripts", schedulerSelected, "bin"), destinationFileName: "", destinationBasePath: filepath.Join(tmpOrganizationContactPath, "scripts", schedulerSelected, releaseNumber, "bin"), isDirectory: true},
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "+pctDebug", "ClientJavaLogging.p"), destinationFileName: "ClientJavaLogging.p", destinationBasePath: filepath.Join(matlabPath, "+pctDebug")},
@@ -1003,6 +1005,8 @@ func main() {
 			"hpcRemoteDesktop.conf",
 			"hpcRemoteCluster.conf",
 		}
+
+		// # Add some code that'll change the example path for the commented out PluginScriptsLocation line.
 
 		var stringNumberOfWorkers string = strconv.Itoa(numberOfWorkers) // Yes, I ended up just making it a string. Get over it.
 
