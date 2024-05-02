@@ -529,6 +529,7 @@ func main() {
 			}
 
 			organizationContact = strings.TrimSpace(organizationContact)
+			organizationContact = strings.TrimSpace(strings.ToLower(organizationContact))
 
 			if organizationContact == "" {
 				organizationContact = "first-last"
@@ -629,12 +630,13 @@ func main() {
 
 			// The "profileName" is used for the cluster profile's name.
 			profileName = strings.TrimSpace(clusterName)
-			clusterName = strings.TrimSpace(strings.ToLower(clusterName))
-			clusterName = strings.ReplaceAll(clusterName, " ", "-")
+			profileName = strings.ReplaceAll(profileName, " ", "-")
+			clusterName = strings.TrimSpace(strings.ToLower(profileName))
 			clusterName = removeBannedSymbols.ReplaceAllString(clusterName, "")
 
 			if clusterName == "" {
-				clusterName = "HPC"
+				clusterName = "hpc"
+				profileName = "HPC"
 				break
 			} else if lettersAndNumbersPattern.MatchString(clusterName) && clusterName != "" {
 				fmt.Print(redText("\nInvalid input. You must include at least 1 letter or number in the cluster's name.\n"))
@@ -879,6 +881,7 @@ func main() {
 		if i == 1 {
 
 			// Copy new engagement files.
+			// Add some code that'll skip everything but the conf file if your team isn't parallel.
 			tasks := []fileCopyTask{
 				{sourceFile: filepath.Join("Utilities", "doc", "Getting_Started_With_Serial_And_Parallel_MATLAB.docx"), destinationFileName: "Getting_Started_With_Serial_And_Parallel_MATLAB.docx", destinationBasePath: docPath},
 				{sourceFile: filepath.Join("Utilities", "doc", "README.txt"), destinationFileName: "README.txt", destinationBasePath: docPath},
@@ -906,7 +909,6 @@ func main() {
 		}
 
 		// Back to make cluster i's stuff!
-		// # Add some code that'll copy the Gold files too.
 		tasks := []fileCopyTask{
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "config-scripts", schedulerSelected, "bin"), destinationFileName: "", destinationBasePath: filepath.Join(tmpOrganizationContactPath, "scripts", schedulerSelected, releaseNumber, "bin"), isDirectory: true},
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "+pctDebug", "ClientJavaLogging.p"), destinationFileName: "ClientJavaLogging.p", destinationBasePath: filepath.Join(matlabPath, "+pctDebug")},
@@ -918,7 +920,11 @@ func main() {
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "conf-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
 			{sourceFile: filepath.Join(gitRepoPath, "Utilities", "matlab-files"), destinationFileName: "", destinationBasePath: matlabPath, isDirectory: true},
 			{sourceFile: filepath.Join(scriptsPath, "matlab-parallel-"+schedulerSelected+"-plugin-main"), destinationFileName: "", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName), isDirectory: true},
-			{sourceFile: filepath.Join(gitRepoPath, "Gold", releaseNumber, schedulerSelected, "communicatingSubmitFcn.m"), destinationFileName: "communicatingSubmitFcn.m", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName, "private")},
+			{sourceFile: filepath.Join(gitRepoPath, "Gold", releaseNumber, schedulerSelected, "communicatingSubmitFcn.m"), destinationFileName: "communicatingSubmitFcn.m", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName)},
+			{sourceFile: filepath.Join(gitRepoPath, "Gold", releaseNumber, schedulerSelected, "getCommonSubmitArgs.m"), destinationFileName: "getCommonSubmitArgs.m", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName, "private")},
+			{sourceFile: filepath.Join(gitRepoPath, "Gold", releaseNumber, schedulerSelected, "getRemoteConnection.m"), destinationFileName: "getRemoteConnection.m", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName, "private")},
+			{sourceFile: filepath.Join(gitRepoPath, "Gold", releaseNumber, schedulerSelected, "independentSubmitFcn.m"), destinationFileName: "independentSubmitFcn.m", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName)},
+			{sourceFile: filepath.Join(gitRepoPath, "Gold", releaseNumber, schedulerSelected, "postConstructFcn.m"), destinationFileName: "postConstructFcn.m", destinationBasePath: filepath.Join(IntegrationScriptsPath, clusterName)},
 		}
 
 		for i, task := range tasks {
@@ -1006,10 +1012,9 @@ func main() {
 			"hpcRemoteCluster.conf",
 		}
 
-		// # Add some code that'll change the example path for the commented out PluginScriptsLocation line.
-
 		var stringNumberOfWorkers string = strconv.Itoa(numberOfWorkers) // Yes, I ended up just making it a string. Get over it.
 
+		// Make changes to the configuration files based on the input you've given.
 		originalContent := map[string]string{
 			"NumWorkers = 100000":  "NumWorkers = " + stringNumberOfWorkers,
 			"ClusterMatlabRoot = ": "ClusterMatlabRoot = " + clusterMatlabRoot,
@@ -1149,6 +1154,14 @@ func ModifyFileContents(filePath, oldText, newText string) error {
 
 		// "Ignore" commented-out lines.
 		if strings.HasPrefix(line, "#") {
+			if strings.HasPrefix(line, "# PluginScriptsLocation") {
+				modifiedLine := strings.ReplaceAll(line, oldText, newText)
+
+				if modifiedLine != "" || line == "" {
+					sb.WriteString(modifiedLine + "\n")
+					continue
+				}
+			}
 			sb.WriteString(line + "\n")
 		} else {
 			modifiedLine := strings.ReplaceAll(line, oldText, newText)

@@ -4,8 +4,6 @@
 
 To do:
 - Settle on some settings
-- Copy Gold files
 - Allow the user to submit their work to GitHub too
-- Fix conf file naming of the cluster to not include spaces
-- Change ONE of the commented lines in the conf file
 - Figure out why the input field sucks in PowerShell
+- Don't attempt to copy things if your team isn't parallel
