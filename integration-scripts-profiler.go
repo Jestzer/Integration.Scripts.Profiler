@@ -1005,7 +1005,7 @@ func main() {
 			}
 		}
 
-		filesToModify := []string{
+		confFilesToModify := []string{
 			"hpcDesktop.conf",
 			"hpcCluster.conf",
 			"hpcRemoteDesktop.conf",
@@ -1025,7 +1025,7 @@ func main() {
 			"Partition = ":         "",
 		}
 
-		for i, fileToModify := range filesToModify {
+		for i, fileToModify := range confFilesToModify {
 			fileToModifyFullPath := filepath.Join(matlabPath, fileToModify)
 
 			if !includeRemoteConfigFiles && (i == 2 || i == 3) {
@@ -1062,6 +1062,31 @@ func main() {
 			err = renameFile(fileToModifyFullPath, modifiedFileName)
 			if err != nil {
 				fmt.Println(redText("\nFailed to rename the file: ", err))
+				cleanUpTempFiles(tmpOrganizationContactPath)
+			}
+		}
+
+		wrappersToModify := []string{
+			"communicatingJobWrapper.sh",
+			"communicatingJobWrapperSmpd.sh",
+			"independentJobWrapper.sh",
+		}
+
+		// Add the timezone code.
+		for _, fileToModify := range wrappersToModify {
+			fileToModifyFullPath := filepath.Join(IntegrationScriptsPath, clusterName, fileToModify)
+			oldText := "Inc.\n\n# If "
+			newText := `Inc.
+		
+if [ ! $TZ ] ; then
+	export TZ=$(timedatectl | grep "Time zone" | cut -d ":" -f2 | cut -d " " -f2)
+fi
+
+# If "`
+
+			err := ModifyMultiLineFileContents(fileToModifyFullPath, oldText, newText)
+			if err != nil {
+				fmt.Println(redText("\nFailed to modify the file: ", err))
 				cleanUpTempFiles(tmpOrganizationContactPath)
 			}
 		}
@@ -1187,6 +1212,22 @@ func ModifyFileContents(filePath, oldText, newText string) error {
 
 	// Write the modified contents back to the file.
 	_, err = file.WriteString(sb.String())
+	return err
+}
+
+func ModifyMultiLineFileContents(filePath, oldText, newText string) error {
+
+	// Open the file for reading.
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	// Replace the content in question.
+	modifiedContent := strings.ReplaceAll(string(content), oldText, newText)
+
+	// Write the modified content back to the file.
+	err = os.WriteFile(filePath, []byte(modifiedContent), 0644)
 	return err
 }
 
