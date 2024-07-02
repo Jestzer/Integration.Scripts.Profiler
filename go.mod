@@ -1,8 +1,8 @@
 module github.com/Jestzer/integration-scripts-profiler
 
-go 1.21.6
+go 1.22.4
 
-//go 1.23
+
 
 require (
 	github.com/fatih/color v1.16.0

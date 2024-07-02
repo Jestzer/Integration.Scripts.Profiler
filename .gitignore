@@ -1,3 +1,5 @@
 .DS_Store
 *.exe
 settings.txt
+Linux/*
+integration-scripts-profiler
