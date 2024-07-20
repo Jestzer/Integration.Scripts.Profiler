@@ -72,7 +72,6 @@ var (
 
 func main() {
 	// To handle keyboard input better.
-	// # Add some code to figure out why this works horribly in PWSH when slashes are used.
 	rl, err := readline.New("> ")
 	if err != nil {
 		panic(err)
